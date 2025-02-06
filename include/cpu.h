@@ -1,0 +1,3 @@
+#pragma once
+
+typedef int c_compier_doesnt_like_empty_translation_unit;

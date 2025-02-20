@@ -4,7 +4,8 @@
 extern "C" {
 #endif
 
-void test_cpp();
+void run_json_tests();
+int process_json_file();
 
 #ifdef __cplusplus
 }

@@ -3,7 +3,7 @@
 
 int main(int argc, char** argv) {
     printf("Hello, world!\n");
-    test_cpp();
+    run_json_tests();
     
     return 0;
 }

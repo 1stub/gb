@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../include/common.h"
+#include "../include/mmu.h"
+#include <stdint.h>
 
 #define FLAG_Z 1<<7
 #define FLAG_N 1<<6

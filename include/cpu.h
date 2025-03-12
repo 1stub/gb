@@ -78,3 +78,4 @@ typedef struct{
 byte cycle();
 void cpu_init();
 void print_registers();
+void set_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, byte pc, byte sp);

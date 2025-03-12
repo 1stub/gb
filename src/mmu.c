@@ -38,15 +38,15 @@ void mmu_init(){
     MEM[IE] = 0x00 ;
 }
 
-byte read(word address){
+byte mem_read(word address){
     return MEM[address];
 }
 
-word read16(word address){
+word mem_read16(word address){
     return MEM[address] | (MEM[address+1] << 8);
 }
 
-void write(word address, byte value){
+void mem_write(word address, byte value){
     MEM[address] = value;
 }
 

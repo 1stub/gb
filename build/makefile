@@ -13,7 +13,7 @@ CC=gcc
 CSTDFLAGS=$(shell sdl2-config --cflags) -Wall -Wextra -Wno-unused-parameter -Wuninitialized -Werror -std=c23 -pedantic -lSDL2 -lSDL2main
 
 CXX=g++
-CXXFLAGS=-std=c++17 -Wall -Wextra -g
+CXXFLAGS=-std=c++20 -Wall -Wextra -g
 
 CFLAGS_OPT.debug=-O0 -g -ggdb -fno-omit-frame-pointer
 CFLAGS_OPT.dev=-O0 -g -ggdb -fno-omit-frame-pointer
@@ -41,7 +41,7 @@ $(OUT_OBJ)json_test.o: $(HEADERS) $(UTIL_DIR)json_test.cpp
 
 $(OUT_EXE)gb: $(HEADERS) $(OBJS) $(SRC_DIR)main.c
 	@mkdir -p $(OUT_EXE)
-	$(CXX) -o $(OUT_EXE)gb $(OBJS) $(SRC_DIR)main.c # Removed previous CFLAGS after $(C*) compiler
+	$(CXX) -o $(OUT_EXE)gb $(OBJS) $(SRC_DIR)main.c
 
 clean:
 	rm -rf $(OUT_EXE)* $(OUT_OBJ)*.o

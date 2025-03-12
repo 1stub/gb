@@ -1,11 +1,8 @@
 #include "json_test.h"
 
-#include <iostream>
-#include <nlohmann/json.hpp>
-#include <fstream>
-//#include <iomanip>
-//#include <sstream>
-#include <filesystem>
+extern "C" {
+    #include "../include/cpu.h"
+}
 
 void run_json_tests() {
     namespace fs = std::filesystem;
@@ -31,8 +28,21 @@ bool process_json_file(const std::filesystem::path& filePath) {
     f >> data;
 
     for(const auto& test : data ){
-        
+        auto initial = test["initial"];
+        set_registers(
+            initial["a"].get<byte>(), 
+            initial["b"].get<byte>(), 
+            initial["c"].get<byte>(), 
+            initial["d"].get<byte>(), 
+            initial["e"].get<byte>(), 
+            initial["f"].get<byte>(), 
+            initial["h"].get<byte>(), 
+            initial["l"].get<byte>(),
+            initial["pc"].get<byte>(),
+            initial["sp"].get<byte>()
+        );
     }
+    print_registers();
 
     return true;
 }

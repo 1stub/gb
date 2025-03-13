@@ -1,12 +1,10 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <iostream>
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <filesystem>
 
 void run_json_tests();
-int process_json_file();
+void process_json_file(const std::filesystem::path& filePath);
 
-#ifdef __cplusplus
-}
-#endif

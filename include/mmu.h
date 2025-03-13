@@ -21,8 +21,8 @@ typedef struct{
 extern MMU mmu;
 
 extern void mmu_init();
-extern byte read(word address);
-extern word read16(word address);
-extern void write(word address, byte value);
+extern byte mem_read(word address);
+extern word mem_read16(word address);
+extern void mem_write(word address, byte value);
 extern void load_rom(char *file);
 char perform_serial();

@@ -1,9 +1,12 @@
 #include "../include/mmu.h"
+#include <string.h>
 
 #define MEM mmu.memory 
 MMU mmu;
 
 void mmu_init(){
+    memset(MEM, 0, sizeof(MEM) * sizeof(byte));
+
     MEM[0xFF00] = 0x1F;
     MEM[TIMA] = 0x00 ; 
     MEM[TMA]  = 0x00 ; 
@@ -38,15 +41,15 @@ void mmu_init(){
     MEM[IE] = 0x00 ;
 }
 
-byte read(word address){
+byte mem_read(word address){
     return MEM[address];
 }
 
-word read16(word address){
+word mem_read16(word address){
     return MEM[address] | (MEM[address+1] << 8);
 }
 
-void write(word address, byte value){
+void mem_write(word address, byte value){
     MEM[address] = value;
 }
 

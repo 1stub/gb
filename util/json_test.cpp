@@ -4,25 +4,39 @@ extern "C" {
     #include "../include/cpu.h"
 }
 
-void run_json_tests() {
-    namespace fs = std::filesystem;
-
-    std::string directory = "../tests/sm83/v1/";
-
+static inline void iterate_files(std::string dir, std::string prefix, bool isextended)
+{
     for(int i = 0; i <= 0xFF; i++) {
-        if(i == 0xCB) break;
+        if(i == 0xCB && !isextended) {
+            i++;
+            iterate_files(dir, "cb ", true);    
+        }
+
+        //skip stop and halt
+        if(!isextended) {
+            if(i == 0x10) continue;
+            if(i == 0x76) continue;
+        }
+
         std::stringstream ss;
+        ss << prefix;
         ss << std::hex << std::setw(2) << std::setfill('0') << i << ".json";
         std::string filename = ss.str();
 
-        fs::path filePath = directory + filename;
-        if (!fs::exists(filePath)) {
+        std::filesystem::path filePath = dir + filename;
+        if (!std::filesystem::exists(filePath)) {
             std::cerr << "Failed to open " << filename << std::endl;
         }
 
-        std::cout << "running test " << "0x"<< std::hex << std::setw(2) << std::setfill('0') << i << std::endl;
+        std::cout << "running test " << "0x"<< prefix <<std::hex << std::setw(2) << std::setfill('0') << i << std::endl;
         process_json_file(filePath);
     }
+}
+
+void run_json_tests() {
+    std::string directory = "../tests/sm83/v1/";
+    iterate_files(directory, "", false);
+    printf("congrats! you passed the sm83 cpu instructions test!\n");
 }
 
 void process_json_file(const std::filesystem::path& filePath) {
@@ -63,6 +77,7 @@ void process_json_file(const std::filesystem::path& filePath) {
             cpu_cycle();
         }
         
+        //Maybe clean this up - doesn't really matter though
         auto final = test["final"];
         if(!check_cpu_registers(
             final["a"].get<byte>(), 

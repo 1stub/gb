@@ -1,7 +1,7 @@
 #include "../util/json_test.h"
 
 extern "C" {
-    #include "../include/cpu.h"
+    #include "../include/emulate.h"
 }
 
 int main(int argc, char** argv) {
@@ -13,6 +13,7 @@ int main(int argc, char** argv) {
     #endif
 
     load_rom(argv[1]);
+    emulate();
     
     return 0;
 }

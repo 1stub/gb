@@ -21,9 +21,9 @@ CFLAGS_OPT.release=-O3 -fno-omit-frame-pointer -march=x86-64-v3
 CFLAGS=${CFLAGS_OPT.${BUILD}} ${CSTDFLAGS}
 CFLAGS_TEST=${CFLAGS_OPT.dev} ${CSTDFLAGS}
 
-HEADERS=$(INCLUDE_DIR)cpu.h $(INCLUDE_DIR)mmu.h $(UTIL_DIR)json_test.h
+HEADERS=$(INCLUDE_DIR)cpu.h $(INCLUDE_DIR)mmu.h $(INCLUDE_DIR)emulate.h $(UTIL_DIR)json_test.h
 
-OBJS=$(OUT_OBJ)cpu.o $(OUT_OBJ)mmu.o $(OUT_OBJ)json_test.o
+OBJS=$(OUT_OBJ)cpu.o $(OUT_OBJ)mmu.o $(OUT_OBJ)emulate.o $(OUT_OBJ)json_test.o
 
 all: $(OUT_EXE)gb
 
@@ -34,6 +34,10 @@ $(OUT_OBJ)cpu.o: $(HEADERS) $(SRC_DIR)cpu.c
 $(OUT_OBJ)mmu.o: $(HEADERS) $(SRC_DIR)mmu.c 
 	@mkdir -p $(OUT_OBJ)
 	$(CC) $(CFLAGS) -o $(OUT_OBJ)mmu.o -c $(SRC_DIR)mmu.c
+
+$(OUT_OBJ)emulate.o: $(HEADERS) $(SRC_DIR)emulate.c 
+	@mkdir -p $(OUT_OBJ)
+	$(CC) $(CFLAGS) -o $(OUT_OBJ)emulate.o -c $(SRC_DIR)emulate.c
 
 $(OUT_OBJ)json_test.o: $(HEADERS) $(UTIL_DIR)json_test.cpp
 	@mkdir -p $(OUT_OBJ)

@@ -39,9 +39,9 @@ $(OUT_OBJ)json_test.o: $(HEADERS) $(UTIL_DIR)json_test.cpp
 	@mkdir -p $(OUT_OBJ)
 	$(CXX) $(CXXFLAGS) -o $(OUT_OBJ)json_test.o -c $(UTIL_DIR)json_test.cpp
 
-$(OUT_EXE)gb: $(HEADERS) $(OBJS) $(SRC_DIR)main.c
+$(OUT_EXE)gb: $(HEADERS) $(OBJS) $(SRC_DIR)main.cpp
 	@mkdir -p $(OUT_EXE)
-	$(CXX) -o $(OUT_EXE)gb $(OBJS) $(SRC_DIR)main.c
+	$(CXX) -o $(OUT_EXE)gb $(OBJS) $(SRC_DIR)main.cpp
 
 clean:
 	rm -rf $(OUT_EXE)* $(OUT_OBJ)*.o

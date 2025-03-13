@@ -75,7 +75,8 @@ typedef struct{
 #define L  cpu.regs.l
 #define HL cpu.regs.hl
 
-byte cycle();
+byte cpu_cycle();
 void cpu_init();
 void print_registers();
-void set_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, byte pc, byte sp);
+void set_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp);
+void check_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp);

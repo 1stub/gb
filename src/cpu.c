@@ -1,4 +1,5 @@
 #include "../include/cpu.h"
+#include <assert.h>
 
 CPU cpu;
 
@@ -15,7 +16,8 @@ static void execute(byte opcode);
 static void extended_execute(byte opcode);
 
 /* Maybe make macro? - probably doesnt matter */
-static inline void SET_FLAGS(int z, int n, int h, int c){
+static inline void SET_FLAGS(int z, int n, int h, int c)
+{
     if (z == RESET) F &= ~(FLAG_Z);
     else if (z > 0) F |= FLAG_Z;
 
@@ -29,7 +31,8 @@ static inline void SET_FLAGS(int z, int n, int h, int c){
     else if (c > 0) F |= FLAG_C;
 }
 
-void cpu_init(){
+void cpu_init()
+{
     AF = 0x01B0;
     BC = 0x0013;
     DE = 0x00D8;
@@ -42,10 +45,13 @@ void cpu_init(){
     cpu.halt_bug = 0;
 }
 
-byte cycle() {
+byte cpu_cycle() 
+{
+    #if 0
     if(cpu.cycles > 0) {
         return 4;
     }
+    #endif
 
     byte cur_instr = mem_read(PC);
     execute(cur_instr);
@@ -53,7 +59,7 @@ byte cycle() {
     return 4;
 }
 
-void set_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, byte pc, byte sp) 
+void set_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp)
 {
     A = a;
     B = b;
@@ -67,9 +73,23 @@ void set_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte 
     SP = sp;
 }
 
+void check_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp)
+{
+    assert(A == a);
+    assert(B == b);
+    assert(C == c);
+    assert(D == d);
+    assert(E == e);
+    assert(F == f);
+    assert(H == h);
+    assert(L == l);
+    assert(PC == pc);
+    assert(SP == sp);
+}
+
 void print_registers() 
 {
-    printf("A:%2X F:%2X B:%2X C:%2X D:%2X E:%2X H:%2X L:%2X SP:%4X PC:%4X PCMEM:%2X,%2X,%2X,%2X", 
+    printf("A:%2X F:%2X B:%2X C:%2X D:%2X E:%2X H:%2X L:%2X SP:%4X PC:%4X PCMEM:%2X,%2X,%2X,%2X\n", 
         A, F, B, C, D, E, H, L, SP, PC, mem_read(PC), mem_read(PC+1), mem_read(PC+2), mem_read(PC+3));
 }
 

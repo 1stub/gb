@@ -1,9 +1,12 @@
 #include "../include/mmu.h"
+#include <string.h>
 
 #define MEM mmu.memory 
 MMU mmu;
 
 void mmu_init(){
+    memset(MEM, 0, sizeof(MEM) * sizeof(byte));
+
     MEM[0xFF00] = 0x1F;
     MEM[TIMA] = 0x00 ; 
     MEM[TMA]  = 0x00 ; 

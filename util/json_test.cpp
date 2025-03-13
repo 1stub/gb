@@ -14,14 +14,16 @@ void run_json_tests() {
     if (!fs::exists(filePath)) {
         std::cerr << "Failed to open " << filename << std::endl;
     }
+
+    process_json_file(filePath);
 }
 
-bool process_json_file(const std::filesystem::path& filePath) {
+void process_json_file(const std::filesystem::path& filePath) {
     using json = nlohmann::json;
     std::ifstream f(filePath);
     if (!f.is_open()) {
         std::cerr << "Could not open file: " << filePath << std::endl;
-        return false;
+        return ;
     }
 
     json data;
@@ -29,7 +31,7 @@ bool process_json_file(const std::filesystem::path& filePath) {
 
     for(const auto& test : data ){
         auto initial = test["initial"];
-        set_registers(
+        set_cpu_registers(
             initial["a"].get<byte>(), 
             initial["b"].get<byte>(), 
             initial["c"].get<byte>(), 
@@ -38,11 +40,40 @@ bool process_json_file(const std::filesystem::path& filePath) {
             initial["f"].get<byte>(), 
             initial["h"].get<byte>(), 
             initial["l"].get<byte>(),
-            initial["pc"].get<byte>(),
-            initial["sp"].get<byte>()
+            initial["pc"].get<word>(),
+            initial["sp"].get<word>()
         );
-    }
-    print_registers();
+        print_registers();
 
-    return true;
+        for(const auto& ram : initial["ram"]) {
+            word addr = ram[0].get<word>();
+            byte data = ram[1].get<byte>();
+            mem_write(addr, data);
+        }
+
+        for(const auto& cycle : test["cycles"]) {
+            cpu_cycle();
+        }
+        print_registers();
+        
+        auto final = test["final"];
+        check_cpu_registers(
+            final["a"].get<byte>(), 
+            final["b"].get<byte>(), 
+            final["c"].get<byte>(), 
+            final["d"].get<byte>(), 
+            final["e"].get<byte>(), 
+            final["f"].get<byte>(), 
+            final["h"].get<byte>(), 
+            final["l"].get<byte>(),
+            final["pc"].get<word>(),
+            final["sp"].get<word>()
+        );
+
+        for(const auto& ram : final["ram"]) {
+            word addr = ram[0].get<word>();
+            byte data = ram[1].get<byte>();
+            assert(mem_read(addr) == data);
+        }
+    }
 }

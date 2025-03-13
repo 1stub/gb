@@ -47,11 +47,7 @@ void cpu_init()
 
 byte cpu_cycle() 
 {
-    #if 0
-    if(cpu.cycles > 0) {
-        return 4;
-    }
-    #endif
+    //Perhaps we cycle every T-cycle rather than by instruction?
 
     byte cur_instr = mem_read(PC);
     execute(cur_instr);
@@ -73,18 +69,22 @@ void set_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, b
     SP = sp;
 }
 
-void check_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp)
+int check_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp)
 {
-    assert(A == a);
-    assert(B == b);
-    assert(C == c);
-    assert(D == d);
-    assert(E == e);
-    assert(F == f);
-    assert(H == h);
-    assert(L == l);
-    assert(PC == pc);
-    assert(SP == sp);
+    if((A == a) &&
+    (B == b) &&
+    (C == c) &&
+    (D == d) &&
+    (E == e) &&
+    (F == f) &&
+    (H == h) &&
+    (L == l) &&
+    (PC == pc) &&
+    (SP == sp)
+    ) {
+        return true;
+    }
+    return false;
 }
 
 void print_registers() 

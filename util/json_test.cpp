@@ -8,14 +8,21 @@ void run_json_tests() {
     namespace fs = std::filesystem;
 
     std::string directory = "../tests/sm83/v1/";
-    std::string filename = "00.json";
 
-    fs::path filePath = directory + filename;
-    if (!fs::exists(filePath)) {
-        std::cerr << "Failed to open " << filename << std::endl;
+    for(int i = 0; i <= 0xFF; i++) {
+        if(i == 0xCB) break;
+        std::stringstream ss;
+        ss << std::hex << std::setw(2) << std::setfill('0') << i << ".json";
+        std::string filename = ss.str();
+
+        fs::path filePath = directory + filename;
+        if (!fs::exists(filePath)) {
+            std::cerr << "Failed to open " << filename << std::endl;
+        }
+
+        std::cout << "running test " << "0x"<< std::hex << std::setw(2) << std::setfill('0') << i << std::endl;
+        process_json_file(filePath);
     }
-
-    process_json_file(filePath);
 }
 
 void process_json_file(const std::filesystem::path& filePath) {
@@ -43,7 +50,6 @@ void process_json_file(const std::filesystem::path& filePath) {
             initial["pc"].get<word>(),
             initial["sp"].get<word>()
         );
-        print_registers();
 
         for(const auto& ram : initial["ram"]) {
             word addr = ram[0].get<word>();
@@ -51,13 +57,13 @@ void process_json_file(const std::filesystem::path& filePath) {
             mem_write(addr, data);
         }
 
+        //Note: I do not handle anything related to r/w/whatever pins
         for(const auto& cycle : test["cycles"]) {
             cpu_cycle();
         }
-        print_registers();
         
         auto final = test["final"];
-        check_cpu_registers(
+        if(!check_cpu_registers(
             final["a"].get<byte>(), 
             final["b"].get<byte>(), 
             final["c"].get<byte>(), 
@@ -68,7 +74,11 @@ void process_json_file(const std::filesystem::path& filePath) {
             final["l"].get<byte>(),
             final["pc"].get<word>(),
             final["sp"].get<word>()
-        );
+        )) {
+            //need to log state of regs before cycles and print aswell
+            print_registers();
+            assert(false);
+        }
 
         for(const auto& ram : final["ram"]) {
             word addr = ram[0].get<word>();

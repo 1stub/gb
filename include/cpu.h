@@ -78,5 +78,7 @@ typedef struct{
 byte cpu_cycle();
 void cpu_init();
 void print_registers();
+const char* log_registers();
+void find_wrong_register (byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp);
 void set_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp);
 int check_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp);

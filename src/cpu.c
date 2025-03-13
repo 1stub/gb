@@ -48,11 +48,10 @@ void cpu_init()
 byte cpu_cycle() 
 {
     //Perhaps we cycle every T-cycle rather than by instruction?
-
     byte cur_instr = mem_read(PC);
     execute(cur_instr);
 
-    return 4;
+    return cpu.cycles;
 }
 
 void set_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp)
@@ -87,10 +86,36 @@ int check_cpu_registers(byte a, byte b, byte c, byte d, byte e, byte f, byte h, 
     return false;
 }
 
+//this is excessive but makes it easy to find exactly where we are deviating from expetcted output
+void find_wrong_register (byte a, byte b, byte c, byte d, byte e, byte f, byte h, byte l, word pc, word sp)
+{
+    assert(A == a);
+    assert(B == b); 
+    assert(C == c); 
+    assert(D == d); 
+    assert(E == e); 
+    assert(F == f); 
+    assert(H == h);
+    assert(L == l); 
+    assert(PC == pc); 
+    assert(SP == sp);
+}
+
 void print_registers() 
 {
     printf("A:%2X F:%2X B:%2X C:%2X D:%2X E:%2X H:%2X L:%2X SP:%4X PC:%4X PCMEM:%2X,%2X,%2X,%2X\n", 
         A, F, B, C, D, E, H, L, SP, PC, mem_read(PC), mem_read(PC+1), mem_read(PC+2), mem_read(PC+3));
+}
+
+const char* log_registers() 
+{
+    static char buffer[128]; 
+
+    snprintf(buffer, sizeof(buffer), 
+             "A:%2X F:%2X B:%2X C:%2X D:%2X E:%2X H:%2X L:%2X SP:%4X PC:%4X PCMEM:%2X,%2X,%2X,%2X\n", 
+             A, F, B, C, D, E, H, L, SP, PC, mem_read(PC), mem_read(PC+1), mem_read(PC+2), mem_read(PC+3));
+
+    return buffer;
 }
 
 static inline void LD(byte *dst, byte val){

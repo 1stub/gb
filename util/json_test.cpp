@@ -57,6 +57,7 @@ void process_json_file(const std::filesystem::path& filePath) {
             mem_write(addr, data);
         }
 
+        const char* log = log_registers();
         //Note: I do not handle anything related to r/w/whatever pins
         for(const auto& cycle : test["cycles"]) {
             cpu_cycle();
@@ -75,9 +76,33 @@ void process_json_file(const std::filesystem::path& filePath) {
             final["pc"].get<word>(),
             final["sp"].get<word>()
         )) {
-            //need to log state of regs before cycles and print aswell
-            print_registers();
-            assert(false);
+            printf("initial state: %s", log);
+            printf("failure state: "); print_registers();
+            printf("expected final state:");
+            printf("A:%2X F:%2X B:%2X C:%2X D:%2X E:%2X H:%2X L:%2X SP:%4X PC:%4X\n",
+                   final["a"].get<byte>(),
+                   final["f"].get<byte>(),
+                   final["b"].get<byte>(),
+                   final["c"].get<byte>(),
+                   final["d"].get<byte>(),
+                   final["e"].get<byte>(),
+                   final["h"].get<byte>(),
+                   final["l"].get<byte>(),
+                   final["sp"].get<word>(),
+                   final["pc"].get<word>());
+
+            find_wrong_register(
+                final["a"].get<byte>(), 
+                final["b"].get<byte>(), 
+                final["c"].get<byte>(), 
+                final["d"].get<byte>(), 
+                final["e"].get<byte>(), 
+                final["f"].get<byte>(), 
+                final["h"].get<byte>(), 
+                final["l"].get<byte>(),
+                final["pc"].get<word>(),
+                final["sp"].get<word>()
+            );
         }
 
         for(const auto& ram : final["ram"]) {

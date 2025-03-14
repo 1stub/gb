@@ -25,10 +25,9 @@ CXXFLAGS+=$(CFLAGS_OPT.$(BUILD))
 
 # Linker flags
 LDFLAGS=-lSDL2 -lSDL2main
+HEADERS=$(INCLUDE_DIR)cpu.h $(INCLUDE_DIR)mmu.h $(INCLUDE_DIR)timer.h $(INCLUDE_DIR)interrupt.h $(INCLUDE_DIR)emulate.h $(UTIL_DIR)json_test.h
 
-HEADERS=$(INCLUDE_DIR)cpu.h $(INCLUDE_DIR)mmu.h $(INCLUDE_DIR)interrupt.h $(INCLUDE_DIR)emulate.h $(UTIL_DIR)json_test.h
-
-OBJS=$(OUT_OBJ)cpu.o $(OUT_OBJ)mmu.o $(OUT_OBJ)interrupt.o $(OUT_OBJ)emulate.o $(OUT_OBJ)json_test.o $(OUT_OBJ)main.o
+OBJS=$(OUT_OBJ)cpu.o $(OUT_OBJ)mmu.o $(OUT_OBJ)timer.o $(OUT_OBJ)interrupt.o $(OUT_OBJ)emulate.o $(OUT_OBJ)json_test.o $(OUT_OBJ)main.o
 
 all: $(OUT_EXE)gb
 
@@ -37,6 +36,10 @@ $(OUT_OBJ)cpu.o: $(SRC_DIR)cpu.c $(HEADERS)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(OUT_OBJ)mmu.o: $(SRC_DIR)mmu.c $(HEADERS)
+	@mkdir -p $(OUT_OBJ)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(OUT_OBJ)timer.o: $(SRC_DIR)timer.c $(HEADERS)
 	@mkdir -p $(OUT_OBJ)
 	$(CC) $(CFLAGS) -o $@ -c $<
 

@@ -1,12 +1,14 @@
 #include "../include/interrupt.h"
 
-void request_interrupt(int interrupt){
+void request_interrupt(int interrupt)
+{
     byte data = mem_read(IF);
     data |= (1 << interrupt);
     mem_write(IF, data);
 }
 
-void service_interrupt(int interrupt){
+void service_interrupt(int interrupt)
+{
     IME = 0;
     byte req = mem_read(IF);
     req &= ~(1 << interrupt); //clear interrupt bit
@@ -23,7 +25,8 @@ void service_interrupt(int interrupt){
     }
 }
 
-void do_interrupts(){
+void do_interrupts()
+{
     if(IME){
         byte req = mem_read(IF);
         byte flag = mem_read(IE);

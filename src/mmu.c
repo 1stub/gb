@@ -51,7 +51,12 @@ word mem_read16(word address){
 }
 
 void mem_write(word address, byte value){
-    MEM[address] = value;
+    if(address == DIV) {
+        mem_write(DIV, 0x00);
+    }
+    else {
+        MEM[address] = value;
+    }
 }
 
 void load_rom(char *file){

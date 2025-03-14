@@ -1,4 +1,5 @@
 #include "../include/mmu.h"
+#include "../include/cpu.h"
 #include <string.h>
 
 #define MEM mmu.memory 
@@ -50,6 +51,8 @@ word mem_read16(word address){
 }
 
 void mem_write(word address, byte value){
+    //if write to div force it to be zero fails sm83 tests.
+
     MEM[address] = value;
 }
 

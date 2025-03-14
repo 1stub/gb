@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../include/common.h"
-#include "../include/mmu.h"
 #include <stdint.h>
 
 #define FLAG_Z 1<<7
@@ -58,6 +57,8 @@ typedef struct{
     byte halt_bug;
 } CPU;
 
+extern CPU cpu;
+
 #define PC  cpu.pc
 #define SP  cpu.sp
 #define IME cpu.ime
@@ -74,6 +75,9 @@ typedef struct{
 #define H  cpu.regs.h
 #define L  cpu.regs.l
 #define HL cpu.regs.hl
+
+//This needs to be visible to interrupt.c
+extern void PUSH(word *dst);
 
 byte cpu_cycle();
 void cpu_init();

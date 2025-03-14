@@ -1,4 +1,5 @@
 #include "../include/mmu.h"
+#include "../include/cpu.h"
 #include <string.h>
 
 #define MEM mmu.memory 

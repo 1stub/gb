@@ -1,5 +1,5 @@
 #pragma once
 
-#include "cpu.h"
+#include "interrupt.h"
 
 void emulate();

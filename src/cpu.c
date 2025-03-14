@@ -1,4 +1,5 @@
 #include "../include/cpu.h"
+#include "../include/mmu.h"
 #include <assert.h>
 
 CPU cpu;
@@ -15,7 +16,6 @@ static const byte extended_pc_inc[0x100];
 static void execute(byte opcode);
 static void extended_execute(byte opcode);
 
-/* Maybe make macro? - probably doesnt matter */
 static inline void SET_FLAGS(int z, int n, int h, int c)
 {
     if (z == RESET) F &= ~(FLAG_Z);
@@ -47,7 +47,6 @@ void cpu_init()
 
 byte cpu_cycle() 
 {
-    //Perhaps we cycle every T-cycle rather than by instruction?
     if(cpu.cycles > 4) {
         cpu.cycles -= 4;
         return 4;
@@ -425,7 +424,7 @@ static inline void POP(word *dst){
     F &= ~0x0F;
 }
 
-extern void PUSH(word *dst){
+void PUSH(word *dst){
     SP--; mem_write(SP, (*dst >> 8));
     SP--; mem_write(SP, *dst & 0x00FF);
 }
@@ -926,7 +925,7 @@ static void execute(byte opcode){
         case 0xD6: SUB(&A, mem_read(PC + 1)); break;
         case 0xD7: RST(0x10); break;
         case 0xD8: RETS(FLAG_C, 0xD8); break;
-        case 0xD9: RET(); IME = 1; break;
+        case 0xD9: IME = 1; RET(); break;
         case 0xDA: JPS(FLAG_C, 0xDA); break;
         case 0xDB: break;
         case 0xDC: CALLS(FLAG_C, 0xDC); break;

@@ -10,42 +10,55 @@ OUT_OBJ=$(BUILD_DIR)output/obj/
 BUILD := dev
 
 CC=gcc
-CSTDFLAGS=$(shell sdl2-config --cflags) -Wall -Wextra -Wno-unused-parameter -Wuninitialized -Werror -std=c23 -pedantic -lSDL2 -lSDL2main
-
 CXX=g++
-CXXFLAGS=-std=c++20 -Wall -Wextra -g
 
-CFLAGS_OPT.debug=-O0 -g -ggdb -fno-omit-frame-pointer
-CFLAGS_OPT.dev=-O0 -g -ggdb -fno-omit-frame-pointer
+# C-specific flags
+CFLAGS=-std=c23 -Wall -Wextra -Wno-unused-parameter -Wuninitialized -Werror -pedantic $(shell sdl2-config --cflags)
+CFLAGS_OPT.debug=-O0 -g3 -ggdb -fno-omit-frame-pointer
+CFLAGS_OPT.dev=-O0 -g3 -ggdb -fno-omit-frame-pointer
 CFLAGS_OPT.release=-O3 -fno-omit-frame-pointer -march=x86-64-v3
-CFLAGS=${CFLAGS_OPT.${BUILD}} ${CSTDFLAGS}
-CFLAGS_TEST=${CFLAGS_OPT.dev} ${CSTDFLAGS}
+CFLAGS+=$(CFLAGS_OPT.$(BUILD))
 
-HEADERS=$(INCLUDE_DIR)cpu.h $(INCLUDE_DIR)mmu.h $(INCLUDE_DIR)emulate.h $(UTIL_DIR)json_test.h
+# C++-specific flags
+CXXFLAGS=-std=c++20 -Wall -Wextra -g3
+CXXFLAGS+=$(CFLAGS_OPT.$(BUILD))
 
-OBJS=$(OUT_OBJ)cpu.o $(OUT_OBJ)mmu.o $(OUT_OBJ)emulate.o $(OUT_OBJ)json_test.o
+# Linker flags
+LDFLAGS=-lSDL2 -lSDL2main
+
+HEADERS=$(INCLUDE_DIR)cpu.h $(INCLUDE_DIR)mmu.h $(INCLUDE_DIR)interrupt.h $(INCLUDE_DIR)emulate.h $(UTIL_DIR)json_test.h
+
+OBJS=$(OUT_OBJ)cpu.o $(OUT_OBJ)mmu.o $(OUT_OBJ)interrupt.o $(OUT_OBJ)emulate.o $(OUT_OBJ)json_test.o $(OUT_OBJ)main.o
 
 all: $(OUT_EXE)gb
 
-$(OUT_OBJ)cpu.o: $(HEADERS) $(SRC_DIR)cpu.c 
+$(OUT_OBJ)cpu.o: $(SRC_DIR)cpu.c $(HEADERS)
 	@mkdir -p $(OUT_OBJ)
-	$(CC) $(CFLAGS) -o $(OUT_OBJ)cpu.o -c $(SRC_DIR)cpu.c
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OUT_OBJ)mmu.o: $(HEADERS) $(SRC_DIR)mmu.c 
+$(OUT_OBJ)mmu.o: $(SRC_DIR)mmu.c $(HEADERS)
 	@mkdir -p $(OUT_OBJ)
-	$(CC) $(CFLAGS) -o $(OUT_OBJ)mmu.o -c $(SRC_DIR)mmu.c
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OUT_OBJ)emulate.o: $(HEADERS) $(SRC_DIR)emulate.c 
+$(OUT_OBJ)interrupt.o: $(SRC_DIR)interrupt.c $(HEADERS)
 	@mkdir -p $(OUT_OBJ)
-	$(CC) $(CFLAGS) -o $(OUT_OBJ)emulate.o -c $(SRC_DIR)emulate.c
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OUT_OBJ)json_test.o: $(HEADERS) $(UTIL_DIR)json_test.cpp
+$(OUT_OBJ)emulate.o: $(SRC_DIR)emulate.c $(HEADERS)
 	@mkdir -p $(OUT_OBJ)
-	$(CXX) $(CXXFLAGS) -o $(OUT_OBJ)json_test.o -c $(UTIL_DIR)json_test.cpp
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OUT_EXE)gb: $(HEADERS) $(OBJS) $(SRC_DIR)main.cpp
+$(OUT_OBJ)json_test.o: $(UTIL_DIR)json_test.cpp $(HEADERS)
+	@mkdir -p $(OUT_OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+$(OUT_OBJ)main.o: $(SRC_DIR)main.cpp $(HEADERS)
+	@mkdir -p $(OUT_OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+$(OUT_EXE)gb: $(OBJS)
 	@mkdir -p $(OUT_EXE)
-	$(CXX) -o $(OUT_EXE)gb $(OBJS) $(SRC_DIR)main.cpp
+	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
 clean:
 	rm -rf $(OUT_EXE)* $(OUT_OBJ)*.o

@@ -2,6 +2,7 @@
 
 extern "C" {
     #include "../include/cpu.h"
+    #include "../include/mmu.h"
 }
 
 static inline void iterate_files(std::string dir, std::string prefix, bool isextended)
@@ -78,6 +79,7 @@ void process_json_file(const std::filesystem::path& filePath) {
         }
         
         //Maybe clean this up - doesn't really matter though
+        //BIG NOTE: could need to check IME and EI
         auto final = test["final"];
         if(!check_cpu_registers(
             final["a"].get<byte>(), 

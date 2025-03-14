@@ -1,8 +1,8 @@
 #include "../include/display.h"
 #include "../include/common.h"
+#include "../include/debugger.h"
 
 #include <assert.h>
-#include <SDL2/SDL.h>
 
 SDL_Window* win = NULL;
 SDL_Surface* win_surface = NULL;
@@ -24,6 +24,8 @@ void setup_display()
         assert(false);
     }
     win_surface = SDL_GetWindowSurface(win);
+
+    init_debugger(win);
 }
 
 void render_pixel_buffer()

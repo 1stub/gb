@@ -9,6 +9,9 @@
 typedef unsigned short word;
 typedef unsigned char byte;
 
+#define DISPLAY_WIDTH 512
+#define DISPLAY_HEIGHT 512
+
 #define JOYP 0xFF00
 #define SB   0xFF01
 #define SC   0xFF02

@@ -1,11 +1,14 @@
 #include "../include/timer.h"
+#include "../include/display.h"
 
 void emulate() {
-    while(1) {
+    int quit = 0;
+
+    while(!quit) {
         cpu_cycle();
         do_interrupts();
-        //timer updates will need to occur at a rate of ~16384 hz, doesnt right now
         update_timers();
+        update_display(&quit);
         printf("%c", perform_serial());
     }
 }

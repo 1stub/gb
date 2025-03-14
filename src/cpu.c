@@ -31,6 +31,27 @@ static inline void SET_FLAGS(int z, int n, int h, int c)
     else if (c > 0) F |= FLAG_C;
 }
 
+//This should handle both the HALT instr and halt bug
+#define HANDLE_HALTING                                         \
+do {                                                           \
+    if(cpu.is_halted){                                         \
+        if (IME && (mem_read(IF) & mem_read(IE))) {            \
+            cpu.is_halted = 0;                                 \
+            cpu.halt_bug = 0;                                  \
+        }else if(!IME && (mem_read(IF) & mem_read(IE))){       \
+            cpu.is_halted = 0;                                 \
+            cpu.halt_bug = 1;                                  \
+        }                                                      \
+    }                                                          \
+    if(cpu.is_halted){                                         \
+        return 4;                                              \
+    }                                                          \
+    if(cpu.halt_bug){                                          \
+        cpu.halt_bug = 0;                                      \
+        PC++;                                                  \
+    }                                                          \
+} while(0)
+
 void cpu_init()
 {
     AF = 0x01B0;
@@ -47,6 +68,7 @@ void cpu_init()
 
 byte cpu_cycle() 
 {
+    HANDLE_HALTING;
     if(cpu.cycles > 4) {
         cpu.cycles -= 4;
         return 4;

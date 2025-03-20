@@ -64,10 +64,16 @@ void cpu_init()
     cpu.cycles = 0;
     cpu.is_halted = 0;
     cpu.halt_bug = 0;
+    cpu.can_run = 1;
+    cpu.should_step = 0;
 }
 
 byte cpu_cycle() 
 {
+    if(!cpu.can_run) {
+        return 0;
+    }
+
     HANDLE_HALTING;
     if(cpu.cycles > 4) {
         cpu.cycles -= 4;
@@ -75,6 +81,11 @@ byte cpu_cycle()
     }
     byte cur_instr = mem_read(PC);
     execute(cur_instr);
+
+    if(cpu.should_step) {
+        cpu.should_step = 0;
+        cpu.can_run = 0;
+    }
 
     return 4;
 }

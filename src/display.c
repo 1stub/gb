@@ -28,7 +28,7 @@ void setup_display()
 
     win = SDL_CreateWindow("gameboy",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        DISPLAY_WIDTH, DISPLAY_HEIGHT, SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN|SDL_WINDOW_ALLOW_HIGHDPI);
+        WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN|SDL_WINDOW_ALLOW_HIGHDPI);
 
     if(!win) {
         fprintf(stderr, "Failed to create SDL window!\n");

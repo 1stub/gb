@@ -35,6 +35,10 @@ void init_debugger(SDL_Window* win)
     nk_style_set_font(ctx, &font->handle);
 }
 
+//
+//A fun improvement to the debugger could be to disassemble
+//the binary so we can see every instruction running
+//
 void render_debugger()
 {
     if(nk_begin(ctx, "Registers", nk_rect(300, 10, 200, 300), 
@@ -77,6 +81,20 @@ void render_debugger()
             nk_label(ctx, buffer, NK_TEXT_LEFT);
     }
     nk_end(ctx);
+
+    if(nk_begin(ctx, "Control", nk_rect(300, 320, 200, 100),
+        NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
+        NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE) ) {
+            nk_layout_row_static(ctx, 50, 80, 2);
+            if (nk_button_label(ctx, "stop")) {
+                cpu.can_run = !cpu.can_run;
+            }
+            if (nk_button_label(ctx, "step")) {
+                cpu.should_step = 1;
+                cpu.can_run = 1;
+            }
+    }
+    nk_end(ctx);
     
     nk_sdl_render(NK_ANTI_ALIASING_ON);
 }
@@ -93,7 +111,7 @@ void debugger_poll_input(SDL_Event *e)
 
 void debugger_end_input() 
 {
-    nk_sdl_handle_grab(); //optional grabbing behaviour
+    nk_sdl_handle_grab(); //optional grabbing behaviour (enabled rn)
     nk_input_end(ctx);
 }
 
@@ -105,5 +123,4 @@ void clearGLColorNuklear()
 void cleanup_debugger()
 {
     nk_sdl_shutdown();
-
 }

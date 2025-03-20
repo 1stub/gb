@@ -1,5 +1,6 @@
 #include "../include/timer.h"
 #include "../include/display.h"
+#include "../include/ppu.h"
 
 void emulate() {
     int quit = 0;
@@ -15,6 +16,7 @@ void emulate() {
     //
     while(!quit) {
         cpu_cycle();
+        ppu_cycle();
         do_interrupts();
         update_timers();
         update_display(&quit);

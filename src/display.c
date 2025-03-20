@@ -1,12 +1,13 @@
 #include "../include/display.h"
-#include "../include/common.h"
 #include "../include/debugger.h"
+#include "../include/ppu.h"
 
-#include "SDL/SDL_opengl.h"
+#include <SDL/SDL_opengl.h>
 #include <assert.h>
 
 SDL_Window* win = NULL;
-SDL_Surface* win_surface = NULL;
+SDL_Texture* gb = NULL;
+SDL_Renderer* renderer = NULL;
 SDL_Event e;
 int win_height, win_width;
 
@@ -36,19 +37,37 @@ void setup_display()
     }
     SDL_GetWindowSize(win, &win_width, &win_height);
 
-    win_surface = SDL_GetWindowSurface(win);
+    //Not confident on renderer accelerated being necessary
+    renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+    gb = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
+        SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT);
 
     init_debugger(win);
 }
 
+void render_texture()
+{
+    SDL_Rect destRect = {
+        10, 10, 
+        GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT    
+    };
+
+    SDL_RenderCopy(renderer, gb, NULL, &destRect);
+}
+
 void render_pixel_buffer()
 {
-    SDL_FillRect(win_surface, NULL, SDL_MapRGB(win_surface->format, 0x00, 0x00, 0x00));
+    void* pixels;
+    int pitch;
 
-    //do all sorts of fun
+    //Lock the texture to get a pointer to its pixel data
+    SDL_LockTexture(gb, NULL, &pixels, &pitch);
+    memcpy(pixels, ppu.pixel_buffer, 160 * 144 * sizeof(uint32_t));
 
-    //we will need to use somethign other than surfacews here since we are using opengl bindings now
-    //SDL_UpdateWindowSurface(win);  
+    //Unlocking updates our new texture changes
+    SDL_UnlockTexture(gb);
+
+    render_texture();
 }
 
 void update_display(int* quit) 

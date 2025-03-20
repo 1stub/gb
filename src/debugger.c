@@ -37,12 +37,30 @@ void init_debugger(SDL_Window* win)
 void render_debugger()
 {
     /* GUI */
-    if(nk_begin(ctx, "Registers", nk_rect(300, 10, 200, 200), NK_WINDOW_TITLE | NK_WINDOW_MOVABLE )){
-
+    if(nk_begin(ctx, "Registers", nk_rect(300, 10, 200, 200), 
+        NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
+        NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE) ) {
+            
     }
     nk_end(ctx);
     
     nk_sdl_render(NK_ANTI_ALIASING_ON);
+}
+
+void debugger_start_input()
+{
+    nk_input_begin(ctx);
+}
+
+void debugger_poll_input(SDL_Event *e)
+{
+    nk_sdl_handle_event(e);
+}
+
+void debugger_end_input() 
+{
+    nk_sdl_handle_grab(); //optional grabbing behaviour
+    nk_input_end(ctx);
 }
 
 void clearGLColorNuklear() 
@@ -53,4 +71,5 @@ void clearGLColorNuklear()
 void cleanup_debugger()
 {
     nk_sdl_shutdown();
+
 }

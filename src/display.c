@@ -53,7 +53,9 @@ void render_pixel_buffer()
 
 void update_display(int* quit) 
 {
+    debugger_start_input();
     while( SDL_PollEvent( &e ) ) { 
+        debugger_poll_input(&e);
         switch(e.type) {
             case SDL_QUIT: {
                 cleanup();
@@ -73,6 +75,7 @@ void update_display(int* quit)
             default: break;
         }
     }
+    debugger_end_input();
 
     SDL_GetWindowSize(win, &win_width, &win_height);
     glViewport(0, 0, win_width, win_height);

@@ -1,4 +1,5 @@
 #include "../include/debugger.h"
+#include "../include/cpu.h"
 
 #include <SDL2/SDL_opengl.h>
 
@@ -36,11 +37,44 @@ void init_debugger(SDL_Window* win)
 
 void render_debugger()
 {
-    /* GUI */
-    if(nk_begin(ctx, "Registers", nk_rect(300, 10, 200, 200), 
+    if(nk_begin(ctx, "Registers", nk_rect(300, 10, 200, 300), 
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE) ) {
-            
+            nk_layout_row_dynamic(ctx, 20, 1); //include this or registers dont print
+            char buffer[32];
+
+            snprintf(buffer, sizeof(buffer), "A: 0x%02X", cpu.regs.a);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "B: 0x%02X", cpu.regs.b);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "C: 0x%02X", cpu.regs.c);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "D: 0x%02X", cpu.regs.d);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "E: 0x%02X", cpu.regs.e);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "F: 0x%02X", cpu.regs.f);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "L: 0x%02X", cpu.regs.h);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "H: 0x%02X", cpu.regs.l);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "SP: 0x%02X", cpu.sp);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "PC: 0x%02X", cpu.pc);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+            snprintf(buffer, sizeof(buffer), "IME: 0x%02X", cpu.ime);
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
     }
     nk_end(ctx);
     

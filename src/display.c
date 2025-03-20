@@ -83,11 +83,9 @@ void update_display(int* quit)
     glClear(GL_COLOR_BUFFER_BIT);
     clearGLColorNuklear() ;
 
-    render_debugger();
-
-    SDL_GL_SwapWindow(win);
-
     render_pixel_buffer();
+    render_debugger();
+    SDL_GL_SwapWindow(win);
 }
 
 void cleanup() 

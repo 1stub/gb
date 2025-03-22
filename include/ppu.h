@@ -3,19 +3,31 @@
 #include "common.h"
 #include <stdint.h>
 
-typedef enum{
+typedef enum {
     OAM_Search,
     Pixel_Transfer,
     HBlank,
     VBlank
 } PPU_state;
 
-typedef struct{
+typedef enum {
+    Fetch_Pixel_Num,
+    Fetch_Tile_Data_Low,
+    Fetch_Tile_Data_High,
+    Push_To_FIFO
+} Fetcher_state;
+
+typedef struct {
     PPU_state state;
     uint32_t cycles;
     int is_window;
     uint32_t pixel_buffer[GB_DISPLAY_WIDTH][GB_DISPLAY_HEIGHT];
 } PPU;
+
+typedef struct {
+    Fetcher_state state;
+    uint32_t pixel;
+} Fetcher;
 
 extern PPU ppu;
 

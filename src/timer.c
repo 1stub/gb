@@ -1,5 +1,8 @@
 #include "../include/timer.h"
 
+#include "../include/interrupt.h"
+#include "../include/mmu.h"
+
 //This will operate on the notion our cpu updates ever 4 T-Cycles
 void update_timers() 
 {

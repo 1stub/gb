@@ -1,6 +1,6 @@
-#include "../include/timer.h"
-#include "../include/display.h"
-#include "../include/ppu.h"
+#include "stdio.h"
+
+#include "../include/emulate.h"
 
 void emulate() {
     int quit = 0;

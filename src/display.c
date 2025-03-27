@@ -99,17 +99,20 @@ void update_display(int* quit)
     SDL_GetWindowSize(win, &win_width, &win_height);
     glViewport(0, 0, win_width, win_height);
 
-    // Always clear the screen and render the debugger
-    glClear(GL_COLOR_BUFFER_BIT);
-    clearGLColorNuklear();
-    render_debugger();
-
+    //
+    //Need to be careful with rendering order. We dont want to clear our pixel buffer display,
+    //but we do want to clear the debugger
+    //
     if(ppu.can_render) {
+        clearGLColorNuklear();  //Clears whole display
+
         render_pixel_buffer();
         ppu.can_render = 0; 
-    }
+    
+        render_debugger();
 
-    SDL_GL_SwapWindow(win);
+        SDL_GL_SwapWindow(win);
+    }
 }
 
 void cleanup() 

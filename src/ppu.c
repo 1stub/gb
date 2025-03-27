@@ -39,10 +39,12 @@ void ppu_init()
 void ppu_cycle() 
 {
     //is LCD enabled?
+    #if 0
     if(!(mem_read(LCDC) & (1<<7))) {
         mem_write(LY, 0);
         return ;
     }
+    #endif
 
     ppu.cycles += 4;
 

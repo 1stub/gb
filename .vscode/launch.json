@@ -5,7 +5,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/output/gb",
-            "args": ["./tests/02-interrupts.gb"],
+            "args": ["./tests/cpu_instrs.gb"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],

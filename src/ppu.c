@@ -32,6 +32,8 @@ void ppu_init()
 
     fetcher.state = Fetch_Pixel_Num;
     fetcher.pixel = 0;
+    fetcher.window_line_counter = 0;
+    fetcher.tile_x = 0;
     
     SET_STAT_STATE(OAM_FLAG);
 }
@@ -59,7 +61,6 @@ void ppu_cycle()
 
                 //no stat interrupt for transitioning to pixel transfer
 
-                get_tilemap_tiledata_baseptrs();
             }
         } break;
 
@@ -75,6 +76,8 @@ void ppu_cycle()
             
             if(fetcher.pixel == 160) {
                 fetcher.pixel = 0;
+                fetcher.tile_x = 0;
+                fetcher.window_line_counter = 0;
                 fetcher.state = Fetch_Pixel_Num;
                 ppu.cycles -= elapsed_cycles;
                 elapsed_cycles = 0;
@@ -137,15 +140,27 @@ void ppu_cycle()
 //
 void update_fifo() 
 {
+    byte ly = mem_read(LY);
+    byte scx = mem_read(SCX);
+    byte scy = mem_read(SCY);
+    byte wy = mem_read(WY);
+
+    //
+    //This does not properly support window pixels. We would need an internal
+    //variable to store the line of the window we are rendering in order to
+    //properlty fetch window pixels. Window trigers on a specific pixel
+    //
     switch(fetcher.state) {
         case Fetch_Pixel_Num : {
-            word xoffset = ((fetcher.pixel / 8) + (mem_read(SCX) / 8)) & 0x1f;
-            word yoffset = 32 * (((mem_read(LY) + mem_read(SCY)) & 0xFF) / 8);
+            word xoffset = (fetcher.tile_x + (scx / 8)) & 0x1F;
+            word yoffset = 32 * (((ly + scy) & 0xFF) / 8);
 
             if(ppu.is_window) {
-                xoffset = mem_read(SCX) / 8;
-                yoffset = 32 * (byte)(((mem_read(LY) - mem_read(WY)) & 0xFF) / 8);
+                xoffset = scx / 8;
+                yoffset = 32 * (((ly - wy) & 0xFF) / 8);
+                fetcher.window_line_counter++;
             }
+            fetcher.tile_x++;
 
             word base = (xoffset + yoffset) & 0x3FF;
 
@@ -154,9 +169,9 @@ void update_fifo()
         } break;
 
         case Fetch_Tile_Data_Low : {
-            word base = (2 * ((mem_read(LY) + mem_read(SCY)) % 8));
+            word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
-                base = (2 * ((mem_read(WY)) % 8));
+                base = (2 * (fetcher.window_line_counter % 8));
             }
 
             if(fetcher.is_unsigned) {
@@ -169,9 +184,9 @@ void update_fifo()
         } break;
         
         case Fetch_Tile_Data_High : {
-            word base = (2 * ((mem_read(LY) + mem_read(SCY)) % 8));
+            word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
-                base = (2 * ((mem_read(WY)) % 8));
+                base = (2 * (fetcher.window_line_counter % 8));
             }
 
             if(fetcher.is_unsigned) {
@@ -186,7 +201,8 @@ void update_fifo()
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
                 if(fetcher.pixel == 160) break;
-                ppu.pixel_buffer[mem_read(LY)][fetcher.pixel++] = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
+                get_tilemap_tiledata_baseptrs(); //we need to update every pixel 
+                ppu.pixel_buffer[ly][fetcher.pixel++] = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
             }
 
             fetcher.state = Fetch_Pixel_Num;

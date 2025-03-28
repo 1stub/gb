@@ -22,12 +22,14 @@ typedef struct {
     uint32_t cycles;
     int is_window;
     int can_render;
-    uint32_t pixel_buffer[GB_DISPLAY_WIDTH][GB_DISPLAY_HEIGHT];
+    uint32_t pixel_buffer[GB_DISPLAY_HEIGHT][GB_DISPLAY_WIDTH];
 } PPU;
 
 typedef struct {
     Fetcher_state state;
     byte pixel;
+    byte tile_x;
+    byte window_line_counter;
     int is_unsigned; //8000 method if true
     word tilemap; //base pointer
     word tiledata; //base pointer

@@ -62,7 +62,12 @@ void render_pixel_buffer()
 
     //Lock the texture to get a pointer to its pixel data
     SDL_LockTexture(gb, NULL, &pixels, &pitch);
-    memcpy(pixels, ppu.pixel_buffer, 160 * 144 * sizeof(uint32_t));
+
+    uint32_t* dst = (uint32_t*)pixels;
+    for (int y = 0; y < 144; y++) {
+        memcpy(dst, ppu.pixel_buffer[y], 160 * sizeof(uint32_t));
+        dst += pitch / sizeof(uint32_t); 
+    }
 
     //Unlocking updates our new texture changes
     SDL_UnlockTexture(gb);

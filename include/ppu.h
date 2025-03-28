@@ -27,13 +27,13 @@ typedef struct {
 
 typedef struct {
     Fetcher_state state;
-    uint32_t pixel;
+    byte pixel;
     int is_unsigned; //8000 method if true
     word tilemap; //base pointer
     word tiledata; //base pointer
-    int16_t tilenumber; //could be signed or not
-    word tiledata_low;
-    word tiledata_high;
+    byte tilenumber; //could be signed or not
+    byte tiledata_low;
+    byte tiledata_high;
 } Fetcher;
 
 extern PPU ppu;

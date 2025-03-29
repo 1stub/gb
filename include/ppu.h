@@ -33,7 +33,7 @@ typedef struct {
     int is_unsigned; //8000 method if true
     word tilemap; //base pointer
     word tiledata; //base pointer
-    byte tilenumber; //could be signed or not
+    int16_t tilenumber; //could be signed or not
     byte tiledata_low;
     byte tiledata_high;
 } Fetcher;

@@ -53,7 +53,23 @@ word mem_read16(word address){
 
 //TODO: Handle cases where specific bits(or whole registers) are read only
 void mem_write(word address, byte value){
-    MEM[address] = value;
+    if(address == LY) {
+        MEM[LY] = 0;
+    }
+    else if(address == DIV) {
+        MEM[DIV] = 0;
+    }
+    else if(address == JOYP) {
+        //only bits 4 & 5 of joyp can be written
+        MEM[JOYP] = (value & 0x30);
+    }
+    else if(address == STAT) {
+        //can only write to bits 0,1,2
+        MEM[STAT] = (value & 0xF8);
+    }
+    else {
+        MEM[address] = value;
+    }
 }
 
 void load_rom(char *file){

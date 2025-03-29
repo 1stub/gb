@@ -1,9 +1,9 @@
 #pragma once
 #include <SDL2/SDL.h>
 
-void init_debugger(SDL_Window* win);
-void render_debugger();
-void debugger_start_input();
-void debugger_poll_input(SDL_Event *e);
-void debugger_end_input();
-void cleanup_debugger();
+extern void init_debugger(SDL_Window* win);
+extern void render_debugger();
+extern void debugger_start_input();
+extern void debugger_poll_input(SDL_Event *e);
+extern void debugger_end_input();
+extern void cleanup_debugger();

@@ -1,12 +1,13 @@
 #include "../include/display.h"
-#include "../include/common.h"
 #include "../include/debugger.h"
+#include "../include/ppu.h"
 
-#include "SDL/SDL_opengl.h"
+#include <SDL/SDL_opengl.h>
 #include <assert.h>
 
 SDL_Window* win = NULL;
-SDL_Surface* win_surface = NULL;
+SDL_Texture* gb = NULL;
+SDL_Renderer* renderer = NULL;
 SDL_Event e;
 int win_height, win_width;
 
@@ -36,19 +37,42 @@ void setup_display()
     }
     SDL_GetWindowSize(win, &win_width, &win_height);
 
-    win_surface = SDL_GetWindowSurface(win);
+    //Not confident on renderer accelerated being necessary
+    renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+    gb = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
+        SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT);
 
     init_debugger(win);
 }
 
+void render_texture()
+{
+    SDL_Rect destRect = {
+        10, 10, 
+        GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT    
+    };
+
+    SDL_RenderCopy(renderer, gb, NULL, &destRect);
+}
+
 void render_pixel_buffer()
 {
-    SDL_FillRect(win_surface, NULL, SDL_MapRGB(win_surface->format, 0x00, 0x00, 0x00));
+    void* pixels;
+    int pitch;
 
-    //do all sorts of fun
+    //Lock the texture to get a pointer to its pixel data
+    SDL_LockTexture(gb, NULL, &pixels, &pitch);
 
-    //we will need to use somethign other than surfacews here since we are using opengl bindings now
-    //SDL_UpdateWindowSurface(win);  
+    uint32_t* dst = (uint32_t*)pixels;
+    for (int y = 0; y < 144; y++) {
+        memcpy(dst, ppu.pixel_buffer[y], 160 * sizeof(uint32_t));
+        dst += pitch / sizeof(uint32_t); 
+    }
+
+    //Unlocking updates our new texture changes
+    SDL_UnlockTexture(gb);
+
+    render_texture();
 }
 
 void update_display(int* quit) 
@@ -80,12 +104,20 @@ void update_display(int* quit)
     SDL_GetWindowSize(win, &win_width, &win_height);
     glViewport(0, 0, win_width, win_height);
 
-    glClear(GL_COLOR_BUFFER_BIT);
-    clearGLColorNuklear() ;
+    //
+    //Need to be careful with rendering order. We dont want to clear our pixel buffer display,
+    //but we do want to clear the debugger
+    //
+    if(ppu.can_render) {
+        clearGLColorNuklear();  //Clears whole display
 
-    render_pixel_buffer();
-    render_debugger();
-    SDL_GL_SwapWindow(win);
+        render_pixel_buffer();
+        ppu.can_render = 0; 
+    
+        render_debugger();
+
+        SDL_GL_SwapWindow(win);
+    }
 }
 
 void cleanup() 

@@ -9,8 +9,8 @@
 typedef unsigned short word;
 typedef unsigned char byte;
 
-#define DISPLAY_WIDTH 256
-#define DISPLAY_HEIGHT 256
+#define GB_DISPLAY_WIDTH 160
+#define GB_DISPLAY_HEIGHT 144
 
 #define WINDOW_WIDTH 512
 #define WINDOW_HEIGHT 512

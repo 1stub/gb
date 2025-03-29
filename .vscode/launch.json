@@ -5,7 +5,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/output/gb",
-            "args": ["./tests/02-interrupts.gb"],
+            "args": ["./tests/dmg-acid2.gb"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],

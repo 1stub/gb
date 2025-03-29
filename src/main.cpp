@@ -2,12 +2,12 @@
 
 extern "C" {
     #include "../include/emulate.h"
-    #include "../include/display.h"
 }
 
 int main(int argc, char** argv) {
     cpu_init();
     mmu_init();
+    ppu_init();
     setup_display();
 
     #ifdef GB_ENABLE_JSON_TESTING

@@ -1,5 +1,8 @@
 #include "../include/interrupt.h"
 
+#include "../include/mmu.h"
+#include "../include/cpu.h"
+
 void request_interrupt(int interrupt)
 {
     byte data = mem_read(IF);

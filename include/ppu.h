@@ -11,7 +11,7 @@ typedef enum {
 } PPU_state;
 
 typedef enum {
-    Fetch_Pixel_Num,
+    Fetch_Tile_Num,
     Fetch_Tile_Data_Low,
     Fetch_Tile_Data_High,
     Push_To_FIFO

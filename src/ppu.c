@@ -10,10 +10,10 @@ void update_fifo();
 void get_tilemap_tiledata_baseptrs();
 uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
 
-#define HBLANK_FLAG 0xFC
-#define VBLANK_FLAG 0xFD
-#define OAM_FLAG 0xFE
-#define PIXEL_TRANSFER_FLAG 0xFF
+#define HBLANK_FLAG 0x00
+#define VBLANK_FLAG 0x01
+#define OAM_FLAG 0x02
+#define PIXEL_TRANSFER_FLAG 0x03
 
 #define SET_STAT_STATE(F)              \
 do {                                   \
@@ -38,6 +38,7 @@ void ppu_init()
     SET_STAT_STATE(OAM_FLAG);
 }
 
+//TODO: add ly=lyc interrupt
 void ppu_cycle() 
 {
     //is LCD enabled?
@@ -130,6 +131,12 @@ void ppu_cycle()
         request_interrupt(1);
     }
 
+    if(mem_read(LY) == mem_read(LYC)) {
+        byte stat = mem_read(STAT);
+        stat |= (1<<6); //ly==lyc flag
+        mem_write(STAT, stat);
+    }
+
     ppu.cycles += 4;
 }
 
@@ -140,16 +147,21 @@ void ppu_cycle()
 //
 void update_fifo() 
 {
+    get_tilemap_tiledata_baseptrs(); //we need to update every tile
+
     byte ly = mem_read(LY);
     byte scx = mem_read(SCX);
     byte scy = mem_read(SCY);
-    byte wy = mem_read(WY);
+    //byte wy = mem_read(WY);
 
     //
     //This does not properly support window pixels. We would need an internal
     //variable to store the line of the window we are rendering in order to
     //properlty fetch window pixels. Window trigers on a specific pixel
     //
+
+    //TODO: figure out how to implement window and undetstand better how it
+    //actually triggers.
     switch(fetcher.state) {
         case Fetch_Pixel_Num : {
             word xoffset = (fetcher.tile_x + (scx / 8)) & 0x1F;
@@ -157,7 +169,7 @@ void update_fifo()
 
             if(ppu.is_window) {
                 xoffset = scx / 8;
-                yoffset = 32 * (((ly - wy) & 0xFF) / 8);
+                yoffset = 32 * ((fetcher.window_line_counter & 0xFF) / 8);
                 fetcher.window_line_counter++;
             }
             fetcher.tile_x++;
@@ -174,6 +186,8 @@ void update_fifo()
                 base = (2 * (fetcher.window_line_counter % 8));
             }
 
+            //Might be a good idea to better look into whether using the +128 instead of reading
+            //signed data is a good idea here or not
             if(fetcher.is_unsigned) {
                 fetcher.tiledata_low = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16));
             }
@@ -201,7 +215,6 @@ void update_fifo()
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
                 if(fetcher.pixel == 160) break;
-                get_tilemap_tiledata_baseptrs(); //we need to update every pixel 
                 ppu.pixel_buffer[ly][fetcher.pixel++] = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
             }
 
@@ -215,7 +228,7 @@ void update_fifo()
 void get_tilemap_tiledata_baseptrs()
 {
     fetcher.tilemap = 0x9800;
-    //default to 8800 method
+    //default to 8800 method (be careful with how this interacts with our weird signed bypass +128)
     fetcher.tiledata = 0x9000;
     fetcher.is_unsigned = false;
     ppu.is_window = false;

@@ -37,6 +37,7 @@ void mmu_init(){
     MEM[BGP]  = 0xFC ;
     MEM[OBP0] = 0xFF ;
     MEM[OBP1] = 0xFF ;
+    MEM[JOYP] = 0x00;
     MEM[0xFF4A] = 0x00 ;
     MEM[0xFF4B] = 0x00 ;
     MEM[IE] = 0x00 ;
@@ -50,9 +51,8 @@ word mem_read16(word address){
     return MEM[address] | (MEM[address+1] << 8);
 }
 
+//TODO: Handle cases where specific bits(or whole registers) are read only
 void mem_write(word address, byte value){
-    //if write to div force it to be zero fails sm83 tests.
-
     MEM[address] = value;
 }
 

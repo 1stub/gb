@@ -3,6 +3,8 @@
 #include "../include/cpu.h"
 #include "../include/interrupt.h"
 
+#include <assert.h>
+
 PPU ppu;
 Fetcher fetcher;
 
@@ -24,42 +26,63 @@ do {                                   \
     mem_write(STAT, stat_value);       \
 } while(0)
 
+
+#define LY_LYC_COMPARE()                                 \
+do {                                                     \
+    byte lyc = mem_read(LYC);                            \
+    byte ly = mem_read(LY);                              \
+    mem_write(STAT,                                      \
+        (mem_read(STAT) & ~(1<<2))| ((ly == lyc) << 2)); \
+    if ((lyc == ly) && (mem_read(STAT) & (1<<6))) {      \
+        request_interrupt(1);                            \
+    }                                                    \
+} while(0)
+
+
 void ppu_init() 
 {
     ppu.state = OAM_Search;
-    ppu.can_render = false;
+    ppu.can_render = true;
     ppu.is_window = false;
+    ppu.should_irq_block = false;
     ppu.cycles = 0;
     
     SET_STAT_STATE(OAM_FLAG);
 }
 
+//TODO: add support for irq blocking and investigate vblank timing
+//in regargs to triggering vblank interupts correctly. I feel they
+//may need to trigger when we finish having ppu disabled.
+
+//current dmg acid bug is most definetly intyerupt related
+
+//Looks like it is most closely related to the ly==lyc interrupt
 void ppu_cycle() 
 {
     //is LCD enabled?
-    if (!(mem_read(LCDC) & 0x80)) {
-        if (ppu.state != VBlank) {
-            mem_write(LY, 0);
-            SET_STAT_STATE(VBlank);
-        }
-        ppu.cycles += 4;
-        return;
+    if (!(mem_read(LCDC) & (1<<7))) {
+        fetcher_reset();
+        mem_write(LY, 0);
+        SET_STAT_STATE(VBlank);
+
+        return ;
     }
 
-    int should_interrupt = false;
-    switch(ppu.state) {
-        case OAM_Search : {
-            if(ppu.cycles >= 80) {
-                SET_STAT_STATE(PIXEL_TRANSFER_FLAG);
+    ppu.cycles += 4;
 
+    switch(ppu.state) {
+        case OAM_Search : { //mode 2
+            if(ppu.cycles >= 80) { 
                 //no stat interrupt for transitioning to pixel transfer
 
                 fetcher_reset();
+
+                SET_STAT_STATE(PIXEL_TRANSFER_FLAG);
                 ppu.state = Pixel_Transfer;
             }
         } break;
 
-        case Pixel_Transfer : {
+        case Pixel_Transfer : { //mode 3
             //Each stage of pixel transfer takes 2 Tcycles so we can just run
             //update_fifo twice (for now) to match the 4 Tcycles each ppu cycle 
             //consumes
@@ -67,85 +90,73 @@ void ppu_cycle()
             update_fifo();
             
             if(fetcher.pixel == 160) {
+                if(mem_read(STAT) & (1 << 3)) { //hblank flag
+                    request_interrupt(1);
+                }
+
                 SET_STAT_STATE(HBLANK_FLAG);
-                should_interrupt = mem_read(STAT) & (1 << 3); //test for hblank interrupt
-                mmu.memory[LY]++;
                 ppu.state = HBlank;
             }
         } break;
 
-        case HBlank : {
+        case HBlank : { //mode 0
             if(ppu.cycles >= 456) {
                 ppu.cycles -= 456;
+                mmu.memory[LY]++;
+                LY_LYC_COMPARE();
 
                 if(mem_read(LY) == 144) {
+                    request_interrupt(0); //set vblank int flag
+                    if(mem_read(STAT) & (1 << 4)) { //vblank interrupt in stat
+                        request_interrupt(1);
+                    }    
+
                     SET_STAT_STATE(VBLANK_FLAG);
-                    should_interrupt = mem_read(STAT) & (1 << 4); //test for vblank interrupt
-                    request_interrupt(0); //do vblank int
                     ppu.state = VBlank;
                 }
                 else {
+                    if(mem_read(STAT) & (1 << 5)) { //oam search interrupt
+                        request_interrupt(1);
+                    } 
+
                     SET_STAT_STATE(OAM_FLAG);
-                    should_interrupt = mem_read(STAT) & (1 << 5); //test for oam search interrupt
                     ppu.state = OAM_Search;
                 }
             }
         } break;
 
-        case VBlank : {
+        case VBlank : { //mode 1
             if(ppu.cycles >= 456) {
                 ppu.cycles -= 456;
                 mmu.memory[LY]++;
 
-                if(mem_read(LY) == 154) {
+                if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
+
+                    if(mem_read(STAT) & (1 << 5)) { //test for oam search interrupt
+                        request_interrupt(1);
+                    } 
+
+                    ppu.can_render = true;
                     SET_STAT_STATE(OAM_FLAG);
-                    should_interrupt = mem_read(STAT) & (1 << 5); //test for oam search interrupt
-                    ppu.can_render = 1;
                     ppu.state = OAM_Search;
                 }
+                LY_LYC_COMPARE();
             }
         } break;
 
         default : break;
     }
-
-    //
-    //For this to be triggered (a STAT interrupt) we need to test
-    //whether the corresponding bit for modes 0-2 in STAT
-    //(bits 3, 4, 5) are set. if this is set then we can request
-    //a stat interrupt. this will only be set on transition into
-    //other states (not including pixel transfer)
-    //
-    if(should_interrupt) {
-        //request stat interrupt
-        request_interrupt(1);
-    }
-
-    byte stat = mem_read(STAT);
-    if(mem_read(LY) == mem_read(LYC)) {
-        stat |= (1<<2); //ly==lyc flag
-        mem_write(STAT, stat);
-        if(mem_read(STAT) & (1<<6)) {
-            request_interrupt(1);
-        }
-    }
-    else {
-        //reset flag
-        stat &= ~(1<<2); //ly==lyc flag
-        mem_write(STAT, stat);
-    }
-
-    ppu.cycles += 4;
 }
 
-inline void fetcher_reset() 
+void fetcher_reset() 
 {
     fetcher.state = Fetch_Tile_Num;
     fetcher.pixel = 0;
     fetcher.tile_x = 0;
     fetcher.window_line_counter = 0;
-    ppu.is_window = 0;
+    ppu.is_window = false;
+    ppu.has_window_triggered = false;  // Reset window trigger each line
 }
 
 //
@@ -158,7 +169,6 @@ void update_fifo()
     byte ly = mem_read(LY);
     byte scx = mem_read(SCX);
     byte scy = mem_read(SCY);
-    byte wx = mem_read(WX) - 7;
 
     //TODO: figure out how to implement window and undetstand better how it
     //actually triggers.
@@ -170,14 +180,8 @@ void update_fifo()
             word yoffset = 32 * (((ly + scy) & 0xFF) / 8);
 
             if(ppu.is_window) {
-                xoffset = fetcher.tile_x;
-                
-                //if we hit wx in our scanline
-                //wx is in pixels, so we can compare our current pixel
-                if(fetcher.pixel >= wx) {
-                    xoffset = (fetcher.tile_x - (wx / 8));
-                }
-                yoffset = 32 * (fetcher.window_line_counter / 8);
+                xoffset = fetcher.tile_x & 0x1F;
+                yoffset = 32 * ((fetcher.window_line_counter & 0xFF)/ 8);
                 fetcher.window_line_counter++;
             }
             fetcher.tile_x++;
@@ -228,23 +232,33 @@ void update_fifo()
     }
 }
 
-inline void get_tilemap_tiledata_baseptrs()
+void get_tilemap_tiledata_baseptrs()
 {
     fetcher.tilemap = 0x9800;
     //default to 8800 method 
     fetcher.tiledata = 0x9000;
     fetcher.is_unsigned = false;
-    ppu.is_window = false;
 
-    //are we rendering the window?
-    if(mem_read(LCDC) & (1 << 5)) {
-        //only set if we are rendering window pixels
-        if(mem_read(LY) >= mem_read(WY)) {
-            ppu.is_window = true;
+    byte lcdc = mem_read(LCDC);
+
+    //is the widnow enabled?
+    if(lcdc & (1 << 5)) {
+        byte wx = mem_read(WX);
+        byte wy = mem_read(WY);
+    
+        printf("yo!\n");
+
+        if(!ppu.has_window_triggered && (mem_read(LY) >= wy)) {
+            if (wx <= 166 && fetcher.pixel + 7 >= wx) {
+                ppu.is_window = true;
+                ppu.has_window_triggered = true;
+                fetcher.tile_x = 0;  // Reset tile X for window
+                fetcher.window_line_counter = 0;
+            }
         }
     }
 
-    if(mem_read(LCDC) & (1 << 4)) {
+    if(lcdc & (1 << 4)) {
         //8000 method
         fetcher.is_unsigned = true;
         fetcher.tiledata = 0x8000;
@@ -252,12 +266,12 @@ inline void get_tilemap_tiledata_baseptrs()
 
     if(!ppu.is_window) {
         //are we rendering the background?
-        if(mem_read(LCDC) & (1 << 3)) {
+        if(lcdc & (1 << 3)) {
             fetcher.tilemap = 0x9C00;
         }
     }   
     else {
-        if(mem_read(LCDC) & (1 << 6)) {
+        if(lcdc & (1 << 6)) {
             fetcher.tilemap = 0x9C00;
         }
     }

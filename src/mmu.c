@@ -56,6 +56,13 @@ void mem_write(word address, byte value){
     if(address == LY) {
         MEM[LY] = 0;
     }
+    else if (address == LCDC) {
+        MEM[address] = value;
+        if (!(value & (1 << 7))) {
+            MEM[LCDC] = 0x00;
+            MEM[STAT] &= 0x7C;
+        }
+    }
     else if(address == DIV) {
         MEM[DIV] = 0;
     }
@@ -63,9 +70,8 @@ void mem_write(word address, byte value){
         //only bits 4 & 5 of joyp can be written
         MEM[JOYP] = (value & 0x30);
     }
-    else if(address == STAT) {
-        //can only write to bits 0,1,2
-        MEM[STAT] = (value & 0xF8);
+    else if ((address >= 0xFEA0) && (address < 0xFEFF)) {
+        //do nothing restricted
     }
     else {
         MEM[address] = value;
@@ -91,6 +97,7 @@ void load_rom(char *file){
     fclose(fp);
 }
 
+#if 0
 char perform_serial(){
     if(!(MEM[SC] & (1 << 7))){
         return '\0';    
@@ -100,3 +107,4 @@ char perform_serial(){
     const char data = (char)MEM[SB];
     return data;
 }
+#endif

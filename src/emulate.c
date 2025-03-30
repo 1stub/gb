@@ -17,9 +17,8 @@ void emulate() {
     while(!quit) {
         cpu_cycle();
         ppu_cycle();
-        do_interrupts();
         update_timers();
+        do_interrupts();
         update_display(&quit);
-        printf("%c", perform_serial());
     }
 }

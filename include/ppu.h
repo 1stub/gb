@@ -22,6 +22,8 @@ typedef struct {
     uint32_t cycles;
     int is_window;
     int can_render;
+    int has_window_triggered;
+    int should_irq_block;
     uint32_t pixel_buffer[GB_DISPLAY_HEIGHT][GB_DISPLAY_WIDTH];
 } PPU;
 

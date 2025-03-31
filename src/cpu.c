@@ -63,17 +63,21 @@ byte cpu_cycle()
         return 0;
     }
 
+    if(cpu.should_set_ime) {
+        IME = true;
+        cpu.should_set_ime = false;
+    }
+
     if(cpu.is_halted) {        
         if(IME && (mem_read(IE) & mem_read(IF))) {
             cpu.is_halted = false;
             cpu.halt_bug = false;
         }
+        if(!IME && (mem_read(IE) & mem_read(IF))) {
+            cpu.is_halted = false;
+            cpu.halt_bug = true;
+        }        
         return 4;
-    }
-
-    if(cpu.should_set_ime) {
-        IME = true;
-        cpu.should_set_ime = false;
     }
 
     if(cpu.cycles > 4) {

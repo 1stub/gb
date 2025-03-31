@@ -244,17 +244,14 @@ void get_tilemap_tiledata_baseptrs()
 
     //is the widnow enabled?
     if(lcdc & (1 << 5)) {
-        byte wx = mem_read(WX);
+        byte wx = mem_read(WX) - 7;
         byte wy = mem_read(WY);
     
-        printf("yo!\n");
-
         if(!ppu.has_window_triggered && (mem_read(LY) >= wy)) {
-            if (wx <= 166 && fetcher.pixel + 7 >= wx) {
+            if (fetcher.pixel >= wx) {
                 ppu.is_window = true;
                 ppu.has_window_triggered = true;
                 fetcher.tile_x = 0;  // Reset tile X for window
-                fetcher.window_line_counter = 0;
             }
         }
     }

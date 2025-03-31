@@ -27,7 +27,7 @@ do {                                   \
 } while(0)
 
 
-#define LY_LYC_COMPARE()                                 \
+void LY_LYC_COMPARE()    {                               \
 do {                                                     \
     byte lyc = mem_read(LYC);                            \
     byte ly = mem_read(LY);                              \
@@ -35,9 +35,10 @@ do {                                                     \
         (mem_read(STAT) & ~(1<<2))| ((ly == lyc) << 2)); \
     if ((lyc == ly) && (mem_read(STAT) & (1<<6))) {      \
         request_interrupt(1);                            \
+        printf("LY==LYC CONDIDTION MET!\n");
     }                                                    \
-} while(0)
-
+} while(0);
+}
 
 void ppu_init() 
 {

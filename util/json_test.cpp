@@ -16,6 +16,8 @@ static inline void iterate_files(std::string dir, std::string prefix, bool isext
         //skip stop and halt
         if(!isextended) {
             if(i == 0x10) continue;
+
+            //NOTE: we ignore halt here
             if(i == 0x76) continue;
         }
 
@@ -76,6 +78,7 @@ void process_json_file(const std::filesystem::path& filePath) {
         //Note: I do not handle anything related to r/w/whatever pins
         for(const auto& cycle : test["cycles"]) {
             cpu_cycle();
+            //print_registers();
         }
         
         //Maybe clean this up - doesn't really matter though
@@ -125,7 +128,11 @@ void process_json_file(const std::filesystem::path& filePath) {
         for(const auto& ram : final["ram"]) {
             word addr = ram[0].get<word>();
             byte data = ram[1].get<byte>();
-            assert(mem_read(addr) == data);
+            if(mem_read(addr) != data) {
+                printf("failed with address %x\n", addr);
+                printf("data was %x\n", data);
+                assert(false);
+            }
         }
     }
 }

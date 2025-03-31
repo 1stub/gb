@@ -15,10 +15,11 @@ void emulate() {
     //the actual display pixels.
     //
     while(!quit) {
+        //Order here is VERY important
         cpu_cycle();
-        ppu_cycle();
         update_timers();
         do_interrupts();
+        ppu_cycle();
         update_display(&quit);
         printf("%c", perform_serial());
     }

@@ -8,7 +8,7 @@
 PPU ppu;
 Fetcher fetcher;
 
-void update_fifo();
+void update_bg_win();
 void fetcher_reset();
 void get_tilemap_tiledata_baseptrs();
 uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
@@ -45,6 +45,8 @@ void ppu_init()
     ppu.is_window = false;
     ppu.should_irq_block = false;
     ppu.cycles = 0;
+
+    fetcher.window_line_counter = 0;
     
     SET_STAT_STATE(OAM_FLAG);
 }
@@ -55,13 +57,13 @@ void ppu_cycle()
     if (!(mem_read(LCDC) & (1<<7))) {
         fetcher_reset();
         ppu.can_render = false;
+        ppu.cycles = 0;
         mem_write(LY, 0);
         SET_STAT_STATE(VBlank);
-
         return ;
     }
 
-    static int can_interrupt = false;
+    int can_interrupt = false;
     switch(ppu.state) {
         case OAM_Search : { //mode 2
             if(ppu.cycles >= 80) { 
@@ -78,10 +80,10 @@ void ppu_cycle()
             //Each stage of pixel transfer takes 2 Tcycles so we can just run
             //update_fifo twice (for now) to match the 4 Tcycles each ppu cycle 
             //consumes
-            update_fifo();
-            update_fifo();
-            
-            if(fetcher.pixel >= 160) {
+            update_bg_win();
+            update_bg_win();
+
+            if(fetcher.pixel == 160) {
                 can_interrupt = (mem_read(STAT) & (1 << 3));
 
                 SET_STAT_STATE(HBLANK_FLAG);
@@ -94,20 +96,26 @@ void ppu_cycle()
                 ppu.cycles -= 456;
                 mmu.memory[LY]++;
 
+                LY_LYC_COMPARE();
+
                 if(mem_read(LY) == 144) {
-                    fetcher.window_line_counter = 0;
                     can_interrupt = (mem_read(STAT) & (1 << 4)); //vblank interrupt in stat
 
+                    request_interrupt(0);
                     SET_STAT_STATE(VBLANK_FLAG);
                     ppu.state = VBlank;
                 }
                 else {
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //oam search interrupt
 
+                    if(ppu.is_window) {
+                        fetcher.window_line_counter++;
+                    }
+
                     SET_STAT_STATE(OAM_FLAG);
                     ppu.state = OAM_Search;
                 }
-            }
+            } 
         } break;
 
         case VBlank : { //mode 1
@@ -117,6 +125,7 @@ void ppu_cycle()
 
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
+                    fetcher.window_line_counter = 0;
 
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 
@@ -124,18 +133,13 @@ void ppu_cycle()
                     SET_STAT_STATE(OAM_FLAG);
                     ppu.state = OAM_Search;
                 }
+                LY_LYC_COMPARE();
             }
         } break;
 
         default : break;
     }
 
-    if(mem_read(LY) == 144) {
-        request_interrupt(0);
-        printf("vblank int\n");
-    }
-
-    LY_LYC_COMPARE();
     if(can_interrupt) {
         request_interrupt(1);
         printf("stat int from ppu\n");
@@ -148,34 +152,27 @@ void fetcher_reset()
 {
     fetcher.state = Fetch_Tile_Num;
     fetcher.pixel = 0;
-    fetcher.tile_x = 0;
     ppu.is_window = false;
-    ppu.has_window_triggered = false;
 }
 
-//
-//Currently just handles bg and window, no sprites
-//Once sprites are integrated this method will likely
-//need to be better named
-//
-void update_fifo() 
+void update_bg_win() 
 {
     byte ly = mem_read(LY);
+    byte wx = mem_read(WX) - 7;
+    //byte wy = mem_read(WY);
     byte scx = mem_read(SCX);
     byte scy = mem_read(SCY);
 
-    //TODO: figure out how to implement window and undetstand better how it
-    //actually triggers.
     switch(fetcher.state) {
         case Fetch_Tile_Num : {
             get_tilemap_tiledata_baseptrs(); //we need to update every tile
 
-            word xoffset = (fetcher.tile_x + (scx / 8)) & 0x1F;
+            word xoffset = ((fetcher.pixel + scx) / 8) & 0x1F;
             word yoffset = 32 * (((ly + scy) & 0xFF) / 8);
 
             if(ppu.is_window) {
-                xoffset = fetcher.tile_x & 0x1F;
-                yoffset = 32 * ((fetcher.window_line_counter & 0xFF)/ 8);
+                xoffset = ((fetcher.pixel - wx) / 8) & 0x1F;
+                yoffset = 32 * (((fetcher.window_line_counter))/ 8);
             }
 
             word base = (xoffset + yoffset) & 0x3FF;
@@ -192,21 +189,30 @@ void update_fifo()
         case Fetch_Tile_Data_Low : {
             word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
-                base = (2 * (fetcher.window_line_counter % 8));
+                base = (2 * (((fetcher.window_line_counter)) % 8));
             }
 
-            fetcher.tiledata_low = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16));
+            if(fetcher.is_unsigned) {
+                fetcher.tiledata_low = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16));
+            }
+            else{
+                fetcher.tiledata_low = mem_read(base + fetcher.tiledata + ((fetcher.tilenumber+128) * 16));
+            }
             fetcher.state = Fetch_Tile_Data_High;
         } break;
         
         case Fetch_Tile_Data_High : {
             word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
-                base = (2 * (fetcher.window_line_counter % 8));
-                fetcher.window_line_counter++;
+                base = (2 * (((fetcher.window_line_counter)) % 8));
             }
 
-            fetcher.tiledata_high = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16) + 1);
+            if(fetcher.is_unsigned) {
+                fetcher.tiledata_high = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16) + 1);
+            }
+            else{
+                fetcher.tiledata_high = mem_read(base + fetcher.tiledata + ((fetcher.tilenumber+128) * 16) + 1);
+            }            
             fetcher.state = Push_To_FIFO;
         } break;
 
@@ -215,9 +221,14 @@ void update_fifo()
                 if(fetcher.pixel == 160) {
                     break;
                 }
-                ppu.pixel_buffer[ly][fetcher.pixel++] = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
+
+                uint32_t color = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
+                if(!(mem_read(LCDC) & 0x01)) { //bg/win enable bit
+                    color = 0xFFFFFFFF; //white
+                }
+
+                ppu.pixel_buffer[ly][fetcher.pixel++] = color;
             }
-            fetcher.tile_x++;
 
             fetcher.state = Fetch_Tile_Num;
         } break;
@@ -232,21 +243,18 @@ void get_tilemap_tiledata_baseptrs()
     //default to 8800 method 
     fetcher.tiledata = 0x8800;
     fetcher.is_unsigned = false;
+    ppu.is_window = false;
 
     byte lcdc = mem_read(LCDC);
     byte ly = mem_read(LY);
 
     //is the widnow enabled?
     if(lcdc & (1 << 5)) {
-        byte wx = mem_read(WX) - 7;
         byte wy = mem_read(WY);
+        byte wx = mem_read(WX) - 7;
     
-        if(!ppu.has_window_triggered && (mem_read(LY) >= wy) && (ly - wy < 144)) {
-            if (fetcher.pixel >= wx) {
-                ppu.is_window = true;
-                ppu.has_window_triggered = true;
-                fetcher.tile_x = 0;  // Reset tile X for window
-            }
+        if(ly >= wy && fetcher.pixel >= wx) {
+            ppu.is_window = true;
         }
     }
 
@@ -276,10 +284,10 @@ uint32_t get_color(byte tile_high, byte tile_low, int bit_position)
 
     //Uses manual pallet, not whatever is in BGP
     switch (color_id) {
-        case 0: return 0xFFFFFFFF; // White
+        case 0: return 0xFFFFFFFF; // white
         case 1: return 0xAAAAAAFF; // Light gray
-        case 2: return 0x555555FF; // Dark gray
+        case 2: return 0x555555E0; // Dark gray
         case 3: return 0x000000FF; // Black
-        default: return 0xFFFFFFFF;
+        default: return 0xFFFFFFFF; // Fallback (white)
     }
 }

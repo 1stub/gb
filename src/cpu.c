@@ -63,6 +63,11 @@ byte cpu_cycle()
         return 0;
     }
 
+    if(cpu.cycles > 4) {
+        cpu.cycles -= 4;
+        return 4;
+    }
+
     if(cpu.should_set_ime) {
         IME = true;
         cpu.should_set_ime = false;
@@ -79,12 +84,7 @@ byte cpu_cycle()
             cpu.is_halted = false;
             cpu.halt_bug = true;
         }        
-        return 4;
-    }
-
-    if(cpu.cycles > 4) {
-        cpu.cycles -= 4;
-        return 4;
+        return 0;
     }
     
     //
@@ -512,10 +512,6 @@ static inline void RST(byte val){
 static inline void HALT()
 {
     cpu.is_halted = true;
-
-    if(!IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
-        cpu.halt_bug = true;
-    }
 }
 
 static inline void ADD(byte* dst, byte val) {

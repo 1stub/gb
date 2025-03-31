@@ -68,12 +68,14 @@ byte cpu_cycle()
         cpu.should_set_ime = false;
     }
 
-    if(cpu.is_halted) {        
-        if(IME && (mem_read(IE) & mem_read(IF))) {
+    if(cpu.is_halted) {     
+        //we dont care about top 3 bits in ie or if
+        //could be set but we need to not change haltbug   
+        if(IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
             cpu.is_halted = false;
             cpu.halt_bug = false;
         }
-        if(!IME && (mem_read(IE) & mem_read(IF))) {
+        if(!IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
             cpu.is_halted = false;
             cpu.halt_bug = true;
         }        
@@ -511,7 +513,7 @@ static inline void HALT()
 {
     cpu.is_halted = true;
 
-    if(!IME && (mem_read(IE) & mem_read(IF))) {
+    if(!IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
         cpu.halt_bug = true;
     }
 }

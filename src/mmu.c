@@ -66,7 +66,6 @@ void mem_write(word address, byte value){
     }
     else if(address == LYC) {
         MEM[address] = value; 
-        printf("lyc write %x\n", value);
 
         byte stat = MEM[STAT];
         byte ly = MEM[LY];
@@ -123,7 +122,6 @@ void load_rom(char *file){
     fclose(fp);
 }
 
-#if 0
 char perform_serial(){
     if(!(MEM[SC] & (1 << 7))){
         return '\0';    
@@ -133,4 +131,3 @@ char perform_serial(){
     const char data = (char)MEM[SB];
     return data;
 }
-#endif

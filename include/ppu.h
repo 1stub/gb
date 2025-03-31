@@ -31,8 +31,8 @@ typedef struct {
     Fetcher_state state;
     byte pixel;
     byte tile_x;
-    byte window_line_counter;
     int is_unsigned; //8000 method if true
+    byte window_line_counter;
     word tilemap; //base pointer
     word tiledata; //base pointer
     int16_t tilenumber; //could be signed or not

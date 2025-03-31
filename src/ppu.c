@@ -27,7 +27,7 @@ do {                                   \
 } while(0)
 
 
-void LY_LYC_COMPARE()    {                               \
+#define LY_LYC_COMPARE()                                 \
 do {                                                     \
     byte lyc = mem_read(LYC);                            \
     byte ly = mem_read(LY);                              \
@@ -35,15 +35,13 @@ do {                                                     \
         (mem_read(STAT) & ~(1<<2))| ((ly == lyc) << 2)); \
     if ((lyc == ly) && (mem_read(STAT) & (1<<6))) {      \
         request_interrupt(1);                            \
-        printf("LY==LYC CONDIDTION MET!\n");
     }                                                    \
 } while(0);
-}
 
 void ppu_init() 
 {
     ppu.state = OAM_Search;
-    ppu.can_render = true;
+    ppu.can_render = false;
     ppu.is_window = false;
     ppu.should_irq_block = false;
     ppu.cycles = 0;
@@ -51,26 +49,19 @@ void ppu_init()
     SET_STAT_STATE(OAM_FLAG);
 }
 
-//TODO: add support for irq blocking and investigate vblank timing
-//in regargs to triggering vblank interupts correctly. I feel they
-//may need to trigger when we finish having ppu disabled.
-
-//current dmg acid bug is most definetly intyerupt related
-
-//Looks like it is most closely related to the ly==lyc interrupt
 void ppu_cycle() 
 {
     //is LCD enabled?
     if (!(mem_read(LCDC) & (1<<7))) {
         fetcher_reset();
+        ppu.can_render = false;
         mem_write(LY, 0);
         SET_STAT_STATE(VBlank);
 
         return ;
     }
 
-    ppu.cycles += 4;
-
+    static int can_interrupt = false;
     switch(ppu.state) {
         case OAM_Search : { //mode 2
             if(ppu.cycles >= 80) { 
@@ -90,10 +81,8 @@ void ppu_cycle()
             update_fifo();
             update_fifo();
             
-            if(fetcher.pixel == 160) {
-                if(mem_read(STAT) & (1 << 3)) { //hblank flag
-                    request_interrupt(1);
-                }
+            if(fetcher.pixel >= 160) {
+                can_interrupt = (mem_read(STAT) & (1 << 3));
 
                 SET_STAT_STATE(HBLANK_FLAG);
                 ppu.state = HBlank;
@@ -104,21 +93,16 @@ void ppu_cycle()
             if(ppu.cycles >= 456) {
                 ppu.cycles -= 456;
                 mmu.memory[LY]++;
-                LY_LYC_COMPARE();
 
                 if(mem_read(LY) == 144) {
-                    request_interrupt(0); //set vblank int flag
-                    if(mem_read(STAT) & (1 << 4)) { //vblank interrupt in stat
-                        request_interrupt(1);
-                    }    
+                    fetcher.window_line_counter = 0;
+                    can_interrupt = (mem_read(STAT) & (1 << 4)); //vblank interrupt in stat
 
                     SET_STAT_STATE(VBLANK_FLAG);
                     ppu.state = VBlank;
                 }
                 else {
-                    if(mem_read(STAT) & (1 << 5)) { //oam search interrupt
-                        request_interrupt(1);
-                    } 
+                    can_interrupt = (mem_read(STAT) & (1 << 5)); //oam search interrupt
 
                     SET_STAT_STATE(OAM_FLAG);
                     ppu.state = OAM_Search;
@@ -134,20 +118,30 @@ void ppu_cycle()
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
 
-                    if(mem_read(STAT) & (1 << 5)) { //test for oam search interrupt
-                        request_interrupt(1);
-                    } 
+                    can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 
                     ppu.can_render = true;
                     SET_STAT_STATE(OAM_FLAG);
                     ppu.state = OAM_Search;
                 }
-                LY_LYC_COMPARE();
             }
         } break;
 
         default : break;
     }
+
+    if(mem_read(LY) == 144) {
+        request_interrupt(0);
+        printf("vblank int\n");
+    }
+
+    LY_LYC_COMPARE();
+    if(can_interrupt) {
+        request_interrupt(1);
+        printf("stat int from ppu\n");
+    }
+
+    ppu.cycles += 4;
 }
 
 void fetcher_reset() 
@@ -155,9 +149,8 @@ void fetcher_reset()
     fetcher.state = Fetch_Tile_Num;
     fetcher.pixel = 0;
     fetcher.tile_x = 0;
-    fetcher.window_line_counter = 0;
     ppu.is_window = false;
-    ppu.has_window_triggered = false;  // Reset window trigger each line
+    ppu.has_window_triggered = false;
 }
 
 //
@@ -183,9 +176,7 @@ void update_fifo()
             if(ppu.is_window) {
                 xoffset = fetcher.tile_x & 0x1F;
                 yoffset = 32 * ((fetcher.window_line_counter & 0xFF)/ 8);
-                fetcher.window_line_counter++;
             }
-            fetcher.tile_x++;
 
             word base = (xoffset + yoffset) & 0x3FF;
 
@@ -212,6 +203,7 @@ void update_fifo()
             word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
                 base = (2 * (fetcher.window_line_counter % 8));
+                fetcher.window_line_counter++;
             }
 
             fetcher.tiledata_high = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16) + 1);
@@ -225,6 +217,7 @@ void update_fifo()
                 }
                 ppu.pixel_buffer[ly][fetcher.pixel++] = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
             }
+            fetcher.tile_x++;
 
             fetcher.state = Fetch_Tile_Num;
         } break;
@@ -237,17 +230,18 @@ void get_tilemap_tiledata_baseptrs()
 {
     fetcher.tilemap = 0x9800;
     //default to 8800 method 
-    fetcher.tiledata = 0x9000;
+    fetcher.tiledata = 0x8800;
     fetcher.is_unsigned = false;
 
     byte lcdc = mem_read(LCDC);
+    byte ly = mem_read(LY);
 
     //is the widnow enabled?
     if(lcdc & (1 << 5)) {
         byte wx = mem_read(WX) - 7;
         byte wy = mem_read(WY);
     
-        if(!ppu.has_window_triggered && (mem_read(LY) >= wy)) {
+        if(!ppu.has_window_triggered && (mem_read(LY) >= wy) && (ly - wy < 144)) {
             if (fetcher.pixel >= wx) {
                 ppu.is_window = true;
                 ppu.has_window_triggered = true;

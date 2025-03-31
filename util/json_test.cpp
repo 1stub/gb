@@ -16,9 +16,6 @@ static inline void iterate_files(std::string dir, std::string prefix, bool isext
         //skip stop and halt
         if(!isextended) {
             if(i == 0x10) continue;
-
-            //NOTE: we ignore halt here
-            if(i == 0x76) continue;
         }
 
         std::stringstream ss;

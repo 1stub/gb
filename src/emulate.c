@@ -20,5 +20,6 @@ void emulate() {
         update_timers();
         do_interrupts();
         update_display(&quit);
+        printf("%c", perform_serial());
     }
 }

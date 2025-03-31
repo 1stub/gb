@@ -1,5 +1,6 @@
 #include "../include/mmu.h"
 #include "../include/cpu.h"
+#include "../include/interrupt.h"
 #include <string.h>
 
 #define MEM mmu.memory 
@@ -56,20 +57,50 @@ void mem_write(word address, byte value){
     if(address == LY) {
         MEM[LY] = 0;
     }
+    else if (address == LCDC) {
+        MEM[address] = value;
+        if (!(value & (1 << 7))) {
+            MEM[LCDC] = 0x00;
+            MEM[STAT] &= 0x7C;
+        }
+    }
+    else if(address == LYC) {
+        MEM[address] = value; 
+
+        byte stat = MEM[STAT];
+        byte ly = MEM[LY];
+        
+        stat = (stat & ~(1 << 2)) | ((ly == value) << 2);
+        MEM[STAT] = stat;
+        
+        if((stat & (1 << 6)) && (ly == value)) {
+            request_interrupt(1); // STAT interrupt
+        }
+    }
     else if(address == DIV) {
         MEM[DIV] = 0;
+        mmu.divider_counter = 0;
+    }
+    else if(address == DMA) {
+        //executeDmaTransfer(value);
+        MEM[address] = value;
     }
     else if(address == JOYP) {
-        //only bits 4 & 5 of joyp can be written
-        MEM[JOYP] = (value & 0x30);
+        // Preserve lower bits (button states) while allowing writes to bits 4 & 5
+        MEM[JOYP] = (value & 0x30) | (MEM[JOYP] & 0xCF);
     }
     else if(address == STAT) {
-        //can only write to bits 0,1,2
-        MEM[STAT] = (value & 0xF8);
+        // Preserve lower 2 bits (current LCD mode) while allowing writes to other bits
+        MEM[STAT] = (value & 0x7C) | (MEM[STAT] & 0x03);
     }
     else {
         MEM[address] = value;
     }
+
+    #ifdef GB_ENABLE_JSON_TESTING
+    MEM[address] = value;
+    #endif
+    
 }
 
 void load_rom(char *file){

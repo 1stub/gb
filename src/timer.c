@@ -9,7 +9,7 @@ void update_timers()
     static int timer_counter = 0;
 
     mmu.divider_counter += 4;
-    if(mmu.divider_counter >- 256) {
+    if(mmu.divider_counter >= 256) {
         mmu.memory[DIV]++; //dont call write, resets to 0
         mmu.divider_counter -= 256;
     }

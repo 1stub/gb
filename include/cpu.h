@@ -51,6 +51,7 @@ typedef struct{
     registers regs;
     byte cycles;
     byte ime;
+    byte should_set_ime;
     word sp;
     word pc;
     byte is_halted;
@@ -78,7 +79,7 @@ extern CPU cpu;
 #define L  cpu.regs.l
 #define HL cpu.regs.hl
 
-//This needs to be visible to interrupt.c
+//This needs to be visible to interrupt
 extern void PUSH(word *dst);
 
 byte cpu_cycle();

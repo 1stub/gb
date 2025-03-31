@@ -6,8 +6,12 @@ CPU cpu;
 
 static byte cycles[0x100];
 static byte pc_inc[0x100];
+
 static const byte extended_cycles[0x100];
+
+#if 0
 static const byte extended_pc_inc[0x100];
+#endif
 
 #define DO_NOTHING -1
 #define RESET 0
@@ -31,26 +35,10 @@ static inline void SET_FLAGS(int z, int n, int h, int c)
     else if (c > 0) F |= FLAG_C;
 }
 
-//This should handle both the HALT instr and halt bug
-#define HANDLE_HALTING                                         \
-do {                                                           \
-    if(cpu.is_halted){                                         \
-        if (IME && (mem_read(IF) & mem_read(IE))) {            \
-            cpu.is_halted = 0;                                 \
-            cpu.halt_bug = 0;                                  \
-        }else if(!IME && (mem_read(IF) & mem_read(IE))){       \
-            cpu.is_halted = 0;                                 \
-            cpu.halt_bug = 1;                                  \
-        }                                                      \
-    }                                                          \
-    if(cpu.is_halted){                                         \
-        return 4;                                              \
-    }                                                          \
-    if(cpu.halt_bug){                                          \
-        cpu.halt_bug = 0;                                      \
-        PC++;                                                  \
-    }                                                          \
-} while(0)
+//
+//TODO: Halt bug test fails. Could be caused my non-delayed EI
+//instruction?
+//
 
 void cpu_init()
 {
@@ -66,6 +54,7 @@ void cpu_init()
     cpu.halt_bug = 0;
     cpu.can_run = 1;
     cpu.should_step = 0;
+    cpu.should_set_ime = false;
 }
 
 byte cpu_cycle() 
@@ -74,13 +63,54 @@ byte cpu_cycle()
         return 0;
     }
 
-    HANDLE_HALTING;
     if(cpu.cycles > 4) {
         cpu.cycles -= 4;
         return 4;
     }
-    byte cur_instr = mem_read(PC);
+
+    if(cpu.should_set_ime) {
+        IME = true;
+        cpu.should_set_ime = false;
+    }
+
+    if(cpu.is_halted) {     
+        //we dont care about top 3 bits in ie or if
+        //could be set but we need to not change haltbug   
+        if(IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
+            cpu.is_halted = false;
+            cpu.halt_bug = false;
+        }
+        if(!IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
+            cpu.is_halted = false;
+            cpu.halt_bug = true;
+        }        
+        return 0;
+    }
+    
+    //
+    //We need to make sure to do one pc inc when fetching
+    //the opcode and then inc accordingly inside the instr
+    //itself. If we dont we are unable to properly replicate halt bug
+    //
+
+    //fetch opcode
+    byte cur_instr = mem_read(PC++);    
+    byte extendex_table_index = mem_read(PC);
+
+    if(cpu.halt_bug) {
+        printf("haltbuggin\n");
+        PC--;
+        cpu.halt_bug = false;
+    }
+
     execute(cur_instr);
+
+    if(cur_instr == 0xCB){
+        cpu.cycles = extended_cycles[extendex_table_index];   
+    }
+    else{
+        cpu.cycles = cycles[cur_instr];
+    }
 
     if(cpu.should_step) {
         cpu.should_step = 0;
@@ -163,7 +193,8 @@ static inline void LD16(word *dst, word val){
 }
 
 static inline void LDA8(){
-    word addr = mem_read16(PC+1);
+    word addr = mem_read16(PC++);
+    PC++;
     byte low = SP & 0x00FF;
     byte high = SP >> 8;
     mem_write(addr, low); addr++;
@@ -181,7 +212,7 @@ static inline void INC(byte *dst){
 }
 
 static inline void LDHL(){
-    const int8_t val = (int8_t)mem_read(PC + 1);
+    const int8_t val = (int8_t)mem_read(PC++);
     HL = SP + val;
     SET_FLAGS(RESET, 
             RESET, 
@@ -192,7 +223,7 @@ static inline void LDHL(){
 
 static inline void ADDSP(){
     //imediate data needed to be signed, hence int8_t instead of byte
-    const int8_t val = (int8_t)mem_read(PC + 1);
+    const int8_t val = (int8_t)mem_read(PC++);
     SET_FLAGS(RESET, 
             RESET, 
             ((SP & 0x0F) + (val & 0x0F)) > 0x0F, 
@@ -280,9 +311,11 @@ static inline void RRCA(){
 static inline void JRN(byte flag, byte opcode){ //jump if not set
     const byte flag_set = F & flag;
     if(!flag_set){
-        PC += (int8_t)mem_read(PC+1); //need signed data here     
+        int8_t val = (int8_t)mem_read(PC++); //need signed data here   
+        PC +=  val;
         cycles[opcode] = 12; 
     }else{
+        PC++;
         cycles[opcode] = 8;
     }
 }
@@ -290,12 +323,13 @@ static inline void JRN(byte flag, byte opcode){ //jump if not set
 static inline void JPN(byte flag, byte opcode){ //jump if not set
     const byte flag_set = F & flag;
     if(!flag_set){
-        byte low = mem_read(PC + 1);
-        byte high = mem_read(PC + 2);
+        byte low = mem_read(PC++);
+        byte high = mem_read(PC++);
         PC = low | (high << 8); 
         pc_inc[opcode] = 0;
         cycles[opcode] = 16; 
     }else{ 
+        PC += 2;
         pc_inc[opcode] = 3;
         cycles[opcode] = 12;
     }
@@ -304,9 +338,11 @@ static inline void JPN(byte flag, byte opcode){ //jump if not set
 static inline void JRS(byte flag, byte opcode){ //jump if set
     const byte flag_set = F & flag;
     if(flag_set){
-        PC+= (int8_t)mem_read(PC+1); //need signed data here      
+        int val = (int8_t)mem_read(PC++); //need signed data here     
+        PC+=  val;
         cycles[opcode] = 12; 
     }else{
+        PC++;
         cycles[opcode] = 8;
     }
 }
@@ -314,25 +350,27 @@ static inline void JRS(byte flag, byte opcode){ //jump if set
 static inline void JPS(byte flag, byte opcode){ //jump if set
     const byte flag_set = F & flag;
     if(flag_set){
-        byte low = mem_read(PC + 1);
-        byte high = mem_read(PC + 2);
+        byte low = mem_read(PC++);
+        byte high = mem_read(PC++);
         PC = low | (high << 8); 
         pc_inc[opcode] = 0;
         cycles[opcode] = 16; 
     }else{
+        PC+=2;
         pc_inc[opcode] = 3;
         cycles[opcode] = 12;
     }
 }
 
 static inline void JP(){ 
-    byte low = mem_read(PC + 1);
-    byte high = mem_read(PC + 2);
+    byte low = mem_read(PC++);
+    byte high = mem_read(PC++);
     PC = low | (high << 8);
 }
 
 static inline void JR(){
-    PC+=(int8_t)mem_read(PC+1);
+    int8_t val = (int8_t)mem_read(PC++);
+    PC += val;
 }
 
 //https://blog.ollien.com/posts/gb-daa/ 
@@ -389,13 +427,14 @@ static inline void CCF(){
 
 static inline void CALLN(byte flag, byte opcode){
     if(!(F & flag)){
-        word address = mem_read(PC + 1) | (mem_read(PC + 2) << 8);
-        SP--; mem_write(SP, (PC+3) >> 8);
-        SP--; mem_write(SP, (PC+3) & 0x00FF);
+        word address = mem_read(PC) | (mem_read(PC + 1) << 8);
+        SP--; mem_write(SP, (PC+2) >> 8);
+        SP--; mem_write(SP, (PC+2) & 0x00FF);
         PC = address;
         pc_inc[opcode] = 0;
         cycles[opcode] = 24;
     }else{
+        PC+=2;
         pc_inc[opcode] = 3;
         cycles[opcode] = 12;
     }
@@ -403,22 +442,23 @@ static inline void CALLN(byte flag, byte opcode){
 
 static inline void CALLS(byte flag, byte opcode){
     if(F & flag){
-        word address = mem_read(PC + 1) | (mem_read(PC + 2) << 8);
-        SP--; mem_write(SP, (PC+3) >> 8);
-        SP--; mem_write(SP, (PC+3) & 0x00FF);
+        word address = mem_read(PC) | (mem_read(PC + 1) << 8);
+        SP--; mem_write(SP, (PC + 2) >> 8);
+        SP--; mem_write(SP, (PC + 2) & 0x00FF);
         PC = address;
         pc_inc[opcode] = 0;
         cycles[opcode] = 24;
     }else{ 
+        PC+=2;
         pc_inc[opcode] = 3;
         cycles[opcode] = 12;
     }
 }
 
 static inline void CALL(){
-    word address = mem_read(PC + 1) | (mem_read(PC + 2) << 8);
-    SP--; mem_write(SP, (PC+3) >> 8);
-    SP--; mem_write(SP, (PC+3) & 0x00FF);
+    word address = mem_read(PC) | (mem_read(PC + 1) << 8);
+    SP--; mem_write(SP, (PC + 2) >> 8);
+    SP--; mem_write(SP, (PC + 2) & 0x00FF);
     PC = address;
 }
 
@@ -463,14 +503,15 @@ void PUSH(word *dst){
 }
 
 static inline void RST(byte val){
-    PC++; SP--;
+    SP--;
     mem_write(SP, PC >> 8); SP--;
     mem_write(SP, PC & 0x00FF); 
     PC = val | (0x00 << 8); 
 }
 
-static inline void HALT(){
-    cpu.is_halted = 1;
+static inline void HALT()
+{
+    cpu.is_halted = true;
 }
 
 static inline void ADD(byte* dst, byte val) {
@@ -725,16 +766,14 @@ static inline void RESMEM(byte bit){
 }
 
 static void execute(byte opcode){
-    byte extendex_table_index = mem_read(PC + 1);
-
     switch(opcode){
         case 0x00: break; //NOP
-        case 0x01: LD16(&BC, mem_read16(PC+1)); break;
+        case 0x01: LD16(&BC, mem_read16(PC)); PC += 2; break;
         case 0x02: mem_write(BC, A); break;
         case 0x03: BC++; break;
         case 0x04: INC(&B); break;
         case 0x05: DEC(&B); break;
-        case 0x06: LD(&B, mem_read(PC+1)); break;
+        case 0x06: LD(&B, mem_read(PC++)); break;
         case 0x07: RLCA(); break;
         case 0x08: LDA8(); break;
         case 0x09: ADD16(&HL, BC); break;
@@ -742,16 +781,16 @@ static void execute(byte opcode){
         case 0x0B: BC--; break;
         case 0x0C: INC(&C); break;
         case 0x0D: DEC(&C); break;
-        case 0x0E: LD(&C, mem_read(PC+1)); break;
+        case 0x0E: LD(&C, mem_read(PC++)); break;
         case 0x0F: RRCA(); break;
 
         case 0x10: break; //STOP
-        case 0x11: LD16(&DE, mem_read16(PC+1)); break;
+        case 0x11: LD16(&DE, mem_read16(PC)); PC += 2; break;
         case 0x12: mem_write(DE, A); break;
         case 0x13: DE++; break;
         case 0x14: INC(&D); break;
         case 0x15: DEC(&D); break;
-        case 0x16: LD(&D, mem_read(PC+1)); break;
+        case 0x16: LD(&D, mem_read(PC++)); break;
         case 0x17: RLA(); break;
         case 0x18: JR(); break;
         case 0x19: ADD16(&HL, DE); break;
@@ -759,16 +798,16 @@ static void execute(byte opcode){
         case 0x1B: DE--; break;
         case 0x1C: INC(&E); break;
         case 0x1D: DEC(&E); break;
-        case 0x1E: LD(&E, mem_read(PC+1)); break;
+        case 0x1E: LD(&E, mem_read(PC++)); break;
         case 0x1F: RRA(); break;
 
         case 0x20: JRN(FLAG_Z, 0x20); break;
-        case 0x21: LD16(&HL, mem_read16(PC+1)); break;
+        case 0x21: LD16(&HL, mem_read16(PC)); PC += 2; break;
         case 0x22: mem_write(HL, A); HL++; break;
         case 0x23: HL++; break;
         case 0x24: INC(&H); break;
         case 0x25: DEC(&H); break;
-        case 0x26: LD(&H, mem_read(PC+1)); break;
+        case 0x26: LD(&H, mem_read(PC++)); break;
         case 0x27: DAA(); break;
         case 0x28: JRS(FLAG_Z, 0x28); break;
         case 0x29: ADD16(&HL, HL); break;
@@ -776,16 +815,16 @@ static void execute(byte opcode){
         case 0x2B: HL--; break;
         case 0x2C: INC(&L); break;
         case 0x2D: DEC(&L); break;
-        case 0x2E: LD(&L, mem_read(PC+1)); break;
+        case 0x2E: LD(&L, mem_read(PC++)); break;
         case 0x2F: CPL(); break;
 
         case 0x30: JRN(FLAG_C, 0x30); break;
-        case 0x31: LD16(&SP, mem_read16(PC+1)); break;
+        case 0x31: LD16(&SP, mem_read16(PC)); PC += 2; break;
         case 0x32: mem_write(HL, A); HL--; break;
         case 0x33: SP++; break;
         case 0x34: INC_MEM(HL); break;
         case 0x35: DEC_MEM(HL); break;
-        case 0x36: mem_write(HL, mem_read(PC+1)); break;
+        case 0x36: mem_write(HL, mem_read(PC++)); break;
         case 0x37: SCF(); break;
         case 0x38: JRS(FLAG_C, 0x38); break;
         case 0x39: ADD16(&HL, SP); break;
@@ -793,7 +832,7 @@ static void execute(byte opcode){
         case 0x3B: SP--; break;
         case 0x3C: INC(&A); break;
         case 0x3D: DEC(&A); break;
-        case 0x3E: LD(&A, mem_read(PC+1)); break;
+        case 0x3E: LD(&A, mem_read(PC++)); break;
         case 0x3F: CCF(); break;
 
         case 0x40: LD(&B, B); break;
@@ -938,15 +977,15 @@ static void execute(byte opcode){
         case 0xC3: JP(); break;
         case 0xC4: CALLN(FLAG_Z, 0xC4); break;
         case 0xC5: PUSH(&BC); break;
-        case 0xC6: ADD(&A, mem_read(PC + 1)); break;
+        case 0xC6: ADD(&A, mem_read(PC++)); break;
         case 0xC7: RST(0x00); break;
         case 0xC8: RETS(FLAG_Z, 0xC8); break;
         case 0xC9: RET(); break;
         case 0xCA: JPS(FLAG_Z, 0xCA); break;
-        case 0xCB: extended_execute(mem_read(PC+1)); break; //extended instrs
+        case 0xCB: extended_execute(mem_read(PC++)); break; //extended instrs
         case 0xCC: CALLS(FLAG_Z, 0xCC); break;
         case 0xCD: CALL(); break;
-        case 0xCE: ADC(&A, mem_read(PC + 1)); break;
+        case 0xCE: ADC(&A, mem_read(PC++)); break;
         case 0xCF: RST(0x08); break;
 
         case 0xD0: RETN(FLAG_C, 0xD0); break;
@@ -955,7 +994,7 @@ static void execute(byte opcode){
         case 0xD3: break;
         case 0xD4: CALLN(FLAG_C, 0xD4); break;
         case 0xD5: PUSH(&DE); break;
-        case 0xD6: SUB(&A, mem_read(PC + 1)); break;
+        case 0xD6: SUB(&A, mem_read(PC++)); break;
         case 0xD7: RST(0x10); break;
         case 0xD8: RETS(FLAG_C, 0xD8); break;
         case 0xD9: IME = 1; RET(); break;
@@ -963,52 +1002,44 @@ static void execute(byte opcode){
         case 0xDB: break;
         case 0xDC: CALLS(FLAG_C, 0xDC); break;
         case 0xDD: break;
-        case 0xDE: SBC(&A, mem_read(PC + 1)); break;
+        case 0xDE: SBC(&A, mem_read(PC++)); break;
         case 0xDF: RST(0x18); break;
 
-        case 0xE0: mem_write(0xFF00 + mem_read(PC + 1), A); break;
+        case 0xE0: mem_write(0xFF00 + mem_read(PC++), A); break;
         case 0xE1: POP(&HL); break;
         case 0xE2: mem_write(0xFF00 + C, A); break;
         case 0xE3: break;
         case 0xE4: break;
         case 0xE5: PUSH(&HL); break;
-        case 0xE6: AND(&A, mem_read(PC + 1)); break;
+        case 0xE6: AND(&A, mem_read(PC++)); break;
         case 0xE7: RST(0x20); break;
         case 0xE8: ADDSP(); break;
         case 0xE9: PC = HL; break;
-        case 0xEA: mem_write(mem_read(PC + 1) | (mem_read(PC + 2) << 8), A); break;
+        case 0xEA: mem_write(mem_read(PC) | (mem_read(PC+1) << 8), A); PC+=2; break;
         case 0xEB: break;
         case 0xEC: break;
         case 0xED: break;
-        case 0xEE: XOR(&A, mem_read(PC + 1)); break;
+        case 0xEE: XOR(&A, mem_read(PC++)); break;
         case 0xEF: RST(0x28); break;
 
-        case 0xF0: LD(&A, mem_read(0xFF00 + mem_read(PC + 1))); break;
+        case 0xF0: LD(&A, mem_read(0xFF00 + mem_read(PC++))); break;
         case 0xF1: POP(&AF); break;
         case 0xF2: LD(&A, mem_read(0xFF00 + C));break;
         case 0xF3: IME = 0; break;
         case 0xF4: break;
         case 0xF5: PUSH(&AF); break;
-        case 0xF6: OR(&A, mem_read(PC + 1)); break;
+        case 0xF6: OR(&A, mem_read(PC++)); break;
         case 0xF7: RST(0x30); break;
         case 0xF8: LDHL(); break;
         case 0xF9: SP = HL; break;
-        case 0xFA: LD(&A, mem_read(mem_read(PC+1) | (mem_read(PC+2)<<8))); break;
-        case 0xFB: IME = 1; break;
+        case 0xFA: LD(&A, mem_read(mem_read(PC) | (mem_read(PC+1)<<8))); PC+=2;break;
+        case 0xFB: cpu.should_set_ime = true; break;
         case 0xFC: break;
         case 0xFD: break;
-        case 0xFE: CP(&A, mem_read(PC + 1)); break;
+        case 0xFE: CP(&A, mem_read(PC++)); break;
         case 0xFF: RST(0x38); break;
 
         default: break;
-    }
-
-    if(opcode == 0xCB){
-        PC += extended_pc_inc[extendex_table_index];
-        cpu.cycles = extended_cycles[extendex_table_index];   
-    }else{
-        PC += pc_inc[opcode];
-        cpu.cycles = cycles[opcode];
     }
 }
 
@@ -1362,6 +1393,7 @@ static const byte extended_cycles[0x100] = {
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8  /* 0xF0 */
 };
 
+#if 0
 static const byte extended_pc_inc[0x100] = {
   /* 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F */
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2, /* 0x00 */
@@ -1381,3 +1413,4 @@ static const byte extended_pc_inc[0x100] = {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2, /* 0xE0 */
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2, /* 0xF0 */
 };
+#endif

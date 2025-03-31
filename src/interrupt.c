@@ -3,6 +3,7 @@
 #include "../include/mmu.h"
 #include "../include/cpu.h"
 
+//sets specified bit in IF
 void request_interrupt(int interrupt)
 {
     byte data = mem_read(IF);

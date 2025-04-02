@@ -14,6 +14,11 @@ void emulate() {
     //to always have the debugger update even when we are not rendering
     //the actual display pixels.
     //
+
+    //
+    //TODO: need to actually understand why this emulation order works
+    //and my prev approach of doing exec, render, timer, int did not
+    //
     while(!quit) {
         //Order here is VERY important
         cpu_cycle();

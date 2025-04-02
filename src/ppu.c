@@ -6,17 +6,26 @@
 #include <assert.h>
 
 PPU ppu;
-Fetcher fetcher;
+Fetcher bg_win_fetcher;
+Fetcher sprites_fetcher;
+
+int sprite_buffer_index = 0;
+uint32_t sprite_buffer[10];
 
 void update_bg_win();
-void fetcher_reset();
-void get_tilemap_tiledata_baseptrs();
+void update_sprites();
+void populate_sprite_buffer();
+void bg_win_fetcher_reset();
+void get_bg_win_tilemap_tiledata();
 uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
 
 #define HBLANK_FLAG 0x00
 #define VBLANK_FLAG 0x01
 #define OAM_FLAG 0x02
 #define PIXEL_TRANSFER_FLAG 0x03
+
+//Useful for sprite priority
+#define COLOR_0 0xE0F8D0
 
 #define SET_STAT_STATE(F)              \
 do {                                   \
@@ -43,10 +52,9 @@ void ppu_init()
     ppu.state = OAM_Search;
     ppu.can_render = false;
     ppu.is_window = false;
-    ppu.should_irq_block = false;
     ppu.cycles = 0;
 
-    fetcher.window_line_counter = 0;
+    bg_win_fetcher.window_line_counter = 0;
     
     SET_STAT_STATE(OAM_FLAG);
 }
@@ -55,7 +63,7 @@ void ppu_cycle()
 {
     //is LCD enabled?
     if (!(mem_read(LCDC) & (1<<7))) {
-        fetcher_reset();
+        bg_win_fetcher_reset();
         ppu.can_render = false;
         ppu.cycles = 0;
         mem_write(LY, 0);
@@ -68,8 +76,9 @@ void ppu_cycle()
         case OAM_Search : { //mode 2
             if(ppu.cycles >= 80) { 
                 //no stat interrupt for transitioning to pixel transfer
+                populate_sprite_buffer();
 
-                fetcher_reset();
+                bg_win_fetcher_reset();
 
                 SET_STAT_STATE(PIXEL_TRANSFER_FLAG);
                 ppu.state = Pixel_Transfer;
@@ -83,7 +92,7 @@ void ppu_cycle()
             update_bg_win();
             update_bg_win();
 
-            if(fetcher.pixel == 160) {
+            if(bg_win_fetcher.pixel == 160) {
                 can_interrupt = (mem_read(STAT) & (1 << 3));
 
                 SET_STAT_STATE(HBLANK_FLAG);
@@ -109,7 +118,7 @@ void ppu_cycle()
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //oam search interrupt
 
                     if(ppu.is_window) {
-                        fetcher.window_line_counter++;
+                        bg_win_fetcher.window_line_counter++;
                     }
 
                     SET_STAT_STATE(OAM_FLAG);
@@ -125,7 +134,7 @@ void ppu_cycle()
 
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
-                    fetcher.window_line_counter = 0;
+                    bg_win_fetcher.window_line_counter = 0;
 
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 
@@ -148,10 +157,28 @@ void ppu_cycle()
     ppu.cycles += 4;
 }
 
-void fetcher_reset() 
+void populate_sprite_buffer()
 {
-    fetcher.state = Fetch_Tile_Num;
-    fetcher.pixel = 0;
+    word base = 0xFE00;
+    byte height = mem_read(LCDC) & (1<<1) ? 16 : 8;
+    for(int i = 0; i < 80; i+=4) {
+        byte y = mem_read(base + i);
+        byte x = mem_read(base + i + 1);
+        byte tile_no = mem_read(base + i + 2);
+        byte flags = mem_read(base + i + 3);
+
+        byte bound = mem_read(LY) + 16;
+        if(x > 0 && bound >= y && bound < (height + y) && sprite_buffer_index < 10) {
+            uint32_t entry = y | (x >> 8) | (tile_no >> 16) | (flags >> 24);
+            sprite_buffer[sprite_buffer_index++] = entry;
+        }
+    }
+}
+
+void bg_win_fetcher_reset() 
+{
+    bg_win_fetcher.state = Fetch_Tile_Num;
+    bg_win_fetcher.pixel = 0;
     ppu.is_window = false;
 }
 
@@ -163,86 +190,123 @@ void update_bg_win()
     byte scx = mem_read(SCX);
     byte scy = mem_read(SCY);
 
-    switch(fetcher.state) {
+    switch(bg_win_fetcher.state) {
         case Fetch_Tile_Num : {
-            get_tilemap_tiledata_baseptrs(); //we need to update every tile
+            get_bg_win_tilemap_tiledata(); //we need to update every tile
 
-            word xoffset = ((fetcher.pixel + scx) / 8) & 0x1F;
+            word xoffset = ((bg_win_fetcher.pixel + scx) / 8) & 0x1F;
             word yoffset = 32 * (((ly + scy) & 0xFF) / 8);
 
             if(ppu.is_window) {
-                xoffset = ((fetcher.pixel - wx) / 8) & 0x1F;
-                yoffset = 32 * (((fetcher.window_line_counter))/ 8);
+                xoffset = ((bg_win_fetcher.pixel - wx) / 8) & 0x1F;
+                yoffset = 32 * (((bg_win_fetcher.window_line_counter))/ 8);
             }
 
             word base = (xoffset + yoffset) & 0x3FF;
 
-            if(fetcher.is_unsigned) {
-                fetcher.tilenumber = (byte)mem_read(fetcher.tilemap + base);
+            if(bg_win_fetcher.is_unsigned) {
+                bg_win_fetcher.tilenumber = (byte)mem_read(bg_win_fetcher.tilemap + base);
             }
             else {
-                fetcher.tilenumber = (int8_t)mem_read(fetcher.tilemap + base);
+                bg_win_fetcher.tilenumber = (int8_t)mem_read(bg_win_fetcher.tilemap + base);
             }
-            fetcher.state = Fetch_Tile_Data_Low;
+            bg_win_fetcher.state = Fetch_Tile_Data_Low;
         } break;
 
         case Fetch_Tile_Data_Low : {
             word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
-                base = (2 * (((fetcher.window_line_counter)) % 8));
+                base = (2 * (((bg_win_fetcher.window_line_counter)) % 8));
             }
 
-            if(fetcher.is_unsigned) {
-                fetcher.tiledata_low = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16));
+            if(bg_win_fetcher.is_unsigned) {
+                bg_win_fetcher.tiledata_low = mem_read(base + bg_win_fetcher.tiledata + (bg_win_fetcher.tilenumber * 16));
             }
             else{
-                fetcher.tiledata_low = mem_read(base + fetcher.tiledata + ((fetcher.tilenumber+128) * 16));
+                bg_win_fetcher.tiledata_low = mem_read(base + bg_win_fetcher.tiledata + ((bg_win_fetcher.tilenumber+128) * 16));
             }
-            fetcher.state = Fetch_Tile_Data_High;
+            bg_win_fetcher.state = Fetch_Tile_Data_High;
         } break;
         
         case Fetch_Tile_Data_High : {
             word base = (2 * ((ly + scy) % 8));
             if(ppu.is_window) {
-                base = (2 * (((fetcher.window_line_counter)) % 8));
+                base = (2 * (((bg_win_fetcher.window_line_counter)) % 8));
             }
 
-            if(fetcher.is_unsigned) {
-                fetcher.tiledata_high = mem_read(base + fetcher.tiledata + (fetcher.tilenumber * 16) + 1);
+            if(bg_win_fetcher.is_unsigned) {
+                bg_win_fetcher.tiledata_high = mem_read(base + bg_win_fetcher.tiledata + (bg_win_fetcher.tilenumber * 16) + 1);
             }
             else{
-                fetcher.tiledata_high = mem_read(base + fetcher.tiledata + ((fetcher.tilenumber+128) * 16) + 1);
+                bg_win_fetcher.tiledata_high = mem_read(base + bg_win_fetcher.tiledata + ((bg_win_fetcher.tilenumber+128) * 16) + 1);
             }            
-            fetcher.state = Push_To_FIFO;
+            bg_win_fetcher.state = Push_To_FIFO;
         } break;
 
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
-                if(fetcher.pixel == 160) {
+                if(bg_win_fetcher.pixel == 160) {
                     break;
                 }
 
-                uint32_t color = get_color(fetcher.tiledata_high, fetcher.tiledata_low, x);
+                uint32_t color = get_color(bg_win_fetcher.tiledata_high, bg_win_fetcher.tiledata_low, x);
                 if(!(mem_read(LCDC) & 0x01)) { //bg/win enable bit
-                    color = 0xFFFFFFFF; //white
+                    color = 0xE0F8D0; //white
                 }
 
-                ppu.pixel_buffer[ly][fetcher.pixel++] = color;
+                ppu.pixel_buffer[ly][bg_win_fetcher.pixel++] = color;
             }
 
-            fetcher.state = Fetch_Tile_Num;
+            bg_win_fetcher.state = Fetch_Tile_Num;
         } break;
 
         default : break;
     }
 }
 
-void get_tilemap_tiledata_baseptrs()
+//
+//Sprites use a separate fifo
+//NOTE: We may need to make the pixel buffer a global storage unit,
+//having to access this buffer from the bg fetcher in sprites
+//is just weird
+//Also will need to figure out how to pixel mix
+//
+void update_sprites() 
 {
-    fetcher.tilemap = 0x9800;
+    switch(sprites_fetcher.state) {
+        case Fetch_Tile_Num : {
+
+            sprites_fetcher.state = Fetch_Tile_Data_Low;
+        } break;
+
+        case Fetch_Tile_Data_Low : {
+
+            
+            sprites_fetcher.state = Fetch_Tile_Data_High;
+        } break;
+        
+        case Fetch_Tile_Data_High : {
+
+
+            sprites_fetcher.state = Push_To_FIFO;
+        } break;
+
+        case Push_To_FIFO : {
+            for(int x = 7; x >= 0 ; x--) {
+                
+            }
+        } break;
+
+        default : break;
+    }
+}
+
+void get_bg_win_tilemap_tiledata()
+{
+    bg_win_fetcher.tilemap = 0x9800;
     //default to 8800 method 
-    fetcher.tiledata = 0x8800;
-    fetcher.is_unsigned = false;
+    bg_win_fetcher.tiledata = 0x8800;
+    bg_win_fetcher.is_unsigned = false;
     ppu.is_window = false;
 
     byte lcdc = mem_read(LCDC);
@@ -253,26 +317,26 @@ void get_tilemap_tiledata_baseptrs()
         byte wy = mem_read(WY);
         byte wx = mem_read(WX) - 7;
     
-        if(ly >= wy && fetcher.pixel >= wx) {
+        if(ly >= wy && bg_win_fetcher.pixel >= wx) {
             ppu.is_window = true;
         }
     }
 
     if(lcdc & (1 << 4)) {
         //8000 method
-        fetcher.is_unsigned = true;
-        fetcher.tiledata = 0x8000;
+        bg_win_fetcher.is_unsigned = true;
+        bg_win_fetcher.tiledata = 0x8000;
     }
 
     if(!ppu.is_window) {
         //are we rendering the background?
         if(lcdc & (1 << 3)) {
-            fetcher.tilemap = 0x9C00;
+            bg_win_fetcher.tilemap = 0x9C00;
         }
     }   
     else {
         if(lcdc & (1 << 6)) {
-            fetcher.tilemap = 0x9C00;
+            bg_win_fetcher.tilemap = 0x9C00;
         }
     }
 }
@@ -282,12 +346,12 @@ uint32_t get_color(byte tile_high, byte tile_low, int bit_position)
     int color_id = ((tile_high >> bit_position) & 0x01) |
         ((tile_low >> bit_position) & 0x01) << 1;
 
-    //Uses manual pallet, not whatever is in BGP
+    //https://lospec.com/palette-list/nintendo-gameboy-bgb
     switch (color_id) {
-        case 0: return 0xFFFFFFFF; // white
-        case 1: return 0xAAAAAAFF; // Light gray
-        case 2: return 0x555555E0; // Dark gray
-        case 3: return 0x000000FF; // Black
-        default: return 0xFFFFFFFF; // Fallback (white)
+        case 0: return COLOR_0; // white
+        case 1: return 0x88C070; // Light gray
+        case 2: return 0x346856; // Dark gray
+        case 3: return 0x81820; // Black
+        default: return COLOR_0; // Fallback (white)
     }
 }

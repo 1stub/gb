@@ -35,6 +35,7 @@ typedef struct {
     int16_t tilenumber; //could be signed or not
     byte tiledata_low;
     byte tiledata_high;
+    int inprogress;
     uint32_t fifo[8];
 } BGWinFetcher;
 
@@ -46,8 +47,10 @@ typedef struct {
     int16_t tilenumber; //could be signed or not
     byte tiledata_low;
     byte tiledata_high;
+    int inprogress;
     uint32_t fifo[8];
 } SpriteFetcher;
+
 
 typedef struct {
     uint8_t y;

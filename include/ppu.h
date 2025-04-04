@@ -22,12 +22,12 @@ typedef struct {
     uint32_t cycles;
     int is_window;
     int can_render;
+    byte pixel;
     uint32_t pixel_buffer[GB_DISPLAY_HEIGHT][GB_DISPLAY_WIDTH];
 } PPU;
 
 typedef struct {
     Fetcher_state state;
-    byte pixel;
     int is_unsigned; //8000 method if true
     byte window_line_counter;
     word tilemap; //base pointer
@@ -35,7 +35,26 @@ typedef struct {
     int16_t tilenumber; //could be signed or not
     byte tiledata_low;
     byte tiledata_high;
-} Fetcher;
+    uint32_t fifo[8];
+} BGWinFetcher;
+
+typedef struct {
+    Fetcher_state state;
+    byte flags; //for current sprite
+    word tilemap; //base pointer
+    word tiledata; //base pointer
+    int16_t tilenumber; //could be signed or not
+    byte tiledata_low;
+    byte tiledata_high;
+    uint32_t fifo[8];
+} SpriteFetcher;
+
+typedef struct {
+    uint8_t y;
+    uint8_t x;
+    uint8_t tile;
+    uint8_t flags;
+} SpriteEntry;
 
 extern PPU ppu;
 

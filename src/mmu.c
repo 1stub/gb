@@ -6,6 +6,8 @@
 #define MEM mmu.memory 
 MMU mmu;
 
+void do_dma(byte data);
+
 void mmu_init(){
     memset(MEM, 0, sizeof(MEM) * sizeof(byte));
 
@@ -82,8 +84,7 @@ void mem_write(word address, byte value){
         mmu.divider_counter = 0;
     }
     else if(address == DMA) {
-        //executeDmaTransfer(value);
-        MEM[address] = value;
+        do_dma(value);
     }
     else if(address == JOYP) {
         // Preserve lower bits (button states) while allowing writes to bits 4 & 5
@@ -120,6 +121,14 @@ void load_rom(char *file){
     }
 
     fclose(fp);
+}
+
+void do_dma(byte data)
+{
+    word address = data << 8;
+    for (int i = 0 ; i < 0xA0; i++){
+        mem_write(0xFE00 + i, mem_read(address + i));
+    }
 }
 
 char perform_serial(){

@@ -6,16 +6,16 @@
 #include <assert.h>
 
 PPU ppu;
-Fetcher bg_win_fetcher;
-Fetcher sprites_fetcher;
+BGWinFetcher bg_win_fetcher;
+SpriteFetcher sprite_fetcher;
 
 int sprite_buffer_index = 0;
-uint32_t sprite_buffer[10];
+SpriteEntry sprite_buffer[10];
 
 void update_bg_win();
 void update_sprites();
 void populate_sprite_buffer();
-void bg_win_fetcher_reset();
+void fetchers_reset();
 void get_bg_win_tilemap_tiledata();
 uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
 
@@ -63,7 +63,7 @@ void ppu_cycle()
 {
     //is LCD enabled?
     if (!(mem_read(LCDC) & (1<<7))) {
-        bg_win_fetcher_reset();
+        fetchers_reset();
         ppu.can_render = false;
         ppu.cycles = 0;
         mem_write(LY, 0);
@@ -78,7 +78,7 @@ void ppu_cycle()
                 //no stat interrupt for transitioning to pixel transfer
                 populate_sprite_buffer();
 
-                bg_win_fetcher_reset();
+                fetchers_reset();
 
                 SET_STAT_STATE(PIXEL_TRANSFER_FLAG);
                 ppu.state = Pixel_Transfer;
@@ -89,10 +89,25 @@ void ppu_cycle()
             //Each stage of pixel transfer takes 2 Tcycles so we can just run
             //update_fifo twice (for now) to match the 4 Tcycles each ppu cycle 
             //consumes
+            int should_render_sprites = false;
+            for(int i = 0; i < 10; i++) {
+                SpriteEntry* s = &sprite_buffer[i];
+                if(s->x <= (ppu.pixel + 8)) {
+                    should_render_sprites = true;
+                    break;
+                }
+            }
+
+            if(should_render_sprites) {
+                update_sprites();
+                update_sprites();
+                bg_win_fetcher.state = Fetch_Tile_Num;
+            }
+            
             update_bg_win();
             update_bg_win();
 
-            if(bg_win_fetcher.pixel == 160) {
+            if(ppu.pixel == 160) {
                 can_interrupt = (mem_read(STAT) & (1 << 3));
 
                 SET_STAT_STATE(HBLANK_FLAG);
@@ -157,33 +172,48 @@ void ppu_cycle()
     ppu.cycles += 4;
 }
 
-void populate_sprite_buffer()
+//
+//This is where pixel mixing of sprite and bg/win occurs
+//
+void shift_pixels()
 {
-    word base = 0xFE00;
-    byte height = mem_read(LCDC) & (1<<1) ? 16 : 8;
-    for(int i = 0; i < 80; i+=4) {
-        byte y = mem_read(base + i);
-        byte x = mem_read(base + i + 1);
-        byte tile_no = mem_read(base + i + 2);
-        byte flags = mem_read(base + i + 3);
+    for(int x = 0; x < 8 ; x++) {
+        if(ppu.pixel == 160) {
+            break;
+        }
 
-        byte bound = mem_read(LY) + 16;
-        if(x > 0 && bound >= y && bound < (height + y) && sprite_buffer_index < 10) {
-            uint32_t entry = y | (x >> 8) | (tile_no >> 16) | (flags >> 24);
-            sprite_buffer[sprite_buffer_index++] = entry;
+        uint32_t sprite_color = sprite_fetcher.fifo[x];
+        uint32_t bg_win_color = bg_win_fetcher.fifo[x];
+
+        if(sprite_color == COLOR_0) {
+            ppu.pixel_buffer[mem_read(LY)][ppu.pixel++] = bg_win_color;
+        }
+        else if(sprite_fetcher.flags & (1<<7) && (bg_win_color != COLOR_0)) { // BG-OBJ priority bit
+            ppu.pixel_buffer[mem_read(LY)][ppu.pixel++] = bg_win_color;
+        }
+        else {
+            ppu.pixel_buffer[mem_read(LY)][ppu.pixel++] = sprite_color;
+
         }
     }
 }
 
-void bg_win_fetcher_reset() 
+void fetchers_reset() 
 {
     bg_win_fetcher.state = Fetch_Tile_Num;
-    bg_win_fetcher.pixel = 0;
+    sprite_fetcher.state = Fetch_Tile_Num;
+    ppu.pixel = 0;
     ppu.is_window = false;
 }
 
 void update_bg_win() 
 {
+    //If bit 1 is true only sprites can draw
+    if (mem_read(LCDC) & (1<<1))
+    {
+        return ;
+    }
+    
     byte ly = mem_read(LY);
     byte wx = mem_read(WX) - 7;
     //byte wy = mem_read(WY);
@@ -194,11 +224,11 @@ void update_bg_win()
         case Fetch_Tile_Num : {
             get_bg_win_tilemap_tiledata(); //we need to update every tile
 
-            word xoffset = ((bg_win_fetcher.pixel + scx) / 8) & 0x1F;
+            word xoffset = ((ppu.pixel + scx) / 8) & 0x1F;
             word yoffset = 32 * (((ly + scy) & 0xFF) / 8);
 
             if(ppu.is_window) {
-                xoffset = ((bg_win_fetcher.pixel - wx) / 8) & 0x1F;
+                xoffset = ((ppu.pixel - wx) / 8) & 0x1F;
                 yoffset = 32 * (((bg_win_fetcher.window_line_counter))/ 8);
             }
 
@@ -245,22 +275,43 @@ void update_bg_win()
 
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
-                if(bg_win_fetcher.pixel == 160) {
-                    break;
-                }
-
                 uint32_t color = get_color(bg_win_fetcher.tiledata_high, bg_win_fetcher.tiledata_low, x);
                 if(!(mem_read(LCDC) & 0x01)) { //bg/win enable bit
                     color = 0xE0F8D0; //white
                 }
-
-                ppu.pixel_buffer[ly][bg_win_fetcher.pixel++] = color;
+                bg_win_fetcher.fifo[x] = color;
             }
+            shift_pixels();
 
             bg_win_fetcher.state = Fetch_Tile_Num;
         } break;
 
         default : break;
+    }
+}
+
+void populate_sprite_buffer()
+{
+    sprite_buffer_index = 0; 
+    word base = 0xFE00;
+    byte height = mem_read(LCDC) & (1<<1) ? 16 : 8;
+
+    for(int i = 0; i < 80; i += 4) {
+        byte y = mem_read(base + i) - 16;
+        byte x = mem_read(base + i + 1) - 8;
+        byte tile_no = mem_read(base + i + 2);
+        byte flags = mem_read(base + i + 3);
+
+        byte bound = mem_read(LY) + 16;
+        if(x > 0 && bound >= y && bound < (height + y) && sprite_buffer_index < 10) {
+            SpriteEntry s = {
+                .y = y,
+                .x = x,
+                .tile = tile_no,
+                .flags = flags
+            };
+            sprite_buffer[sprite_buffer_index++] = s;
+        }
     }
 }
 
@@ -273,28 +324,45 @@ void update_bg_win()
 //
 void update_sprites() 
 {
-    switch(sprites_fetcher.state) {
-        case Fetch_Tile_Num : {
+    if (sprite_buffer_index >= 10) return;
 
-            sprites_fetcher.state = Fetch_Tile_Data_Low;
+    SpriteEntry* sprite = &sprite_buffer[sprite_buffer_index];
+
+    switch(sprite_fetcher.state) {
+        case Fetch_Tile_Num: {
+            sprite_fetcher.tilenumber = sprite->tile;
+            sprite_fetcher.flags = sprite->flags;
+            sprite_fetcher.state = Fetch_Tile_Data_Low;
         } break;
-
-        case Fetch_Tile_Data_Low : {
-
+        
+        case Fetch_Tile_Data_Low: {
+            byte line = (mem_read(LY) - sprite->y) & 0x07;
+            if (sprite->flags & (1<<6)) line = 7 - line; // Y-flip
             
-            sprites_fetcher.state = Fetch_Tile_Data_High;
+            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2);
+            sprite_fetcher.tiledata_low = mem_read(addr);
+
+            sprite_fetcher.state = Fetch_Tile_Data_High;
         } break;
         
         case Fetch_Tile_Data_High : {
+            byte line = (mem_read(LY) - sprite->y) & 0x07;
+            if (sprite->flags & (1<<6)) line = 7 - line; // Y-flip
+            
+            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2) + 1;
+            sprite_fetcher.tiledata_high = mem_read(addr);
 
-
-            sprites_fetcher.state = Push_To_FIFO;
+            sprite_fetcher.state = Push_To_FIFO;
         } break;
 
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
-                
+                uint32_t color = get_color(sprite_fetcher.tiledata_high, sprite_fetcher.tiledata_low, x);
+                sprite_fetcher.fifo[x] = color;
             }
+            sprite_buffer_index++; //Hmmm need to figure out how to properly use this index...
+
+            sprite_fetcher.state = Fetch_Tile_Num;
         } break;
 
         default : break;
@@ -317,7 +385,7 @@ void get_bg_win_tilemap_tiledata()
         byte wy = mem_read(WY);
         byte wx = mem_read(WX) - 7;
     
-        if(ly >= wy && bg_win_fetcher.pixel >= wx) {
+        if(ly >= wy && ppu.pixel >= wx) {
             ppu.is_window = true;
         }
     }

@@ -51,12 +51,12 @@ typedef struct {
     uint32_t fifo[8];
 } SpriteFetcher;
 
-
 typedef struct {
-    uint8_t y;
-    uint8_t x;
-    uint8_t tile;
-    uint8_t flags;
+    byte y;
+    byte x;
+    byte tile;
+    byte flags;
+    byte palette;
 } SpriteEntry;
 
 extern PPU ppu;

@@ -109,7 +109,7 @@ void ppu_cycle()
             //update_fifo twice (for now) to match the 4 Tcycles each ppu cycle 
             //consumes
 
-            if(sprite_buffer[sprite_buffer_index].x <= ppu.pixel) {
+            if(sprite_buffer[sprite_buffer_index].x <= ppu.pixel && sprite_buffer_index >= 0) {
                 update_sprites();
                 update_bg_win();
                 bg_win_fetcher.state = Fetch_Tile_Num;
@@ -166,7 +166,6 @@ void ppu_cycle()
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
                     bg_win_fetcher.window_line_counter = 0;
-
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 
                     ppu.can_render = true;
@@ -360,13 +359,7 @@ void populate_sprite_buffer()
 //
 void update_sprites() 
 {
-    if (sprite_buffer_index == 0xFF) {
-        sprite_fetcher.inprogress = false;
-        sprite_fetcher.flags = 0x00;
-        sprite_fetcher.state = Fetch_Tile_Num;
-        sprite_fetcher.tilenumber = 0xFF;
-        return;
-    }
+    if (sprite_buffer_index < 0) return;
 
     SpriteEntry* sprite = &sprite_buffer[sprite_buffer_index];
 

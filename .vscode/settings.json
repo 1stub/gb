@@ -71,6 +71,5 @@
         "queue": "cpp",
         "stack": "cpp",
         "deque": "c"
-    },
-    "workbench.productIconTheme": "undoDebugger"
+    }
 }

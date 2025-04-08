@@ -166,6 +166,10 @@ void ppu_cycle()
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
                     bg_win_fetcher.window_line_counter = 0;
+                    bg_win_fetcher.state = Fetch_Tile_Num;
+                    bg_win_fetcher.inprogress = false;
+                    sprite_fetcher.state = Fetch_Tile_Num;
+                    sprite_fetcher.inprogress = false;
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 
                     ppu.can_render = true;
@@ -334,7 +338,8 @@ void populate_sprite_buffer()
                 .x = x,
                 .tile = tile_no,
                 .flags = flags,
-                .palette = palette
+                .palette = palette,
+                .height = height
             };
             sprite_buffer[sprite_buffer_index++] = s;
         }
@@ -367,20 +372,35 @@ void update_sprites()
         case Fetch_Tile_Num: {
             sprite_fetcher.inprogress = true;
 
-            sprite_fetcher.tilenumber = sprite->tile;
+            if(sprite->height == 16) { // Ignore bit 0 for 16 bit high tiles
+                sprite_fetcher.tilenumber = sprite->tile & 0xFE;
+            }
+            else {
+                sprite_fetcher.tilenumber = sprite->tile;
+            }
             sprite_fetcher.flags = sprite->flags;
             sprite_fetcher.state = Fetch_Tile_Data_Low;
         } break;
         
         case Fetch_Tile_Data_Low: {
-            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + ((mem_read(LY) - sprite->y) * 2);
+            int line = mem_read(LY) - sprite->y;
+            if(sprite_fetcher.flags & (1<<6)) { // Y-Flip
+                line -= (sprite->height - 1); // Need this to incorperate tall sprites
+                line *= -1;
+            }
+            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2);
             sprite_fetcher.tiledata_low = mem_read(addr);
 
             sprite_fetcher.state = Fetch_Tile_Data_High;
         } break;
         
         case Fetch_Tile_Data_High : {
-            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + ((mem_read(LY) - sprite->y) * 2) + 1;
+            int line = mem_read(LY) - sprite->y;
+            if(sprite_fetcher.flags & (1<<6)) { // Y-Flip
+                line -= (sprite->height - 1); // Need this to incorperate tall sprites
+                line *= -1;
+            }
+            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2) + 1;
             sprite_fetcher.tiledata_high = mem_read(addr);
 
             sprite_fetcher.state = Push_To_FIFO;
@@ -388,7 +408,12 @@ void update_sprites()
 
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
-                uint32_t color = get_color(sprite_fetcher.tiledata_high, sprite_fetcher.tiledata_low, x);
+                int color_index = x;
+                if(sprite_fetcher.flags & (1<<5)) {
+                    color_index -= 7;
+                    color_index *= -1;
+                }
+                uint32_t color = get_color(sprite_fetcher.tiledata_high, sprite_fetcher.tiledata_low, color_index);
                 sprite_fetcher.fifo[x] = color;
             }
             sprite_buffer_index--;

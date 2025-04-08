@@ -57,6 +57,7 @@ typedef struct {
     byte tile;
     byte flags;
     byte palette;
+    byte height;
 } SpriteEntry;
 
 extern PPU ppu;

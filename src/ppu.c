@@ -3,21 +3,13 @@
 #include "../include/cpu.h"
 #include "../include/interrupt.h"
 
-#include <stdlib.h> //qsort
-
 PPU ppu;
 BGWinFetcher bg_win_fetcher;
 SpriteFetcher sprite_fetcher;
 
+#define SPRITE_BUFFER_SIZE 10
 int sprite_buffer_index = 0;
-SpriteEntry sprite_buffer[10];
-
-// Used in sorting sprite buffer based on X position
-int comp(const void *a, const void *b) {
-    SpriteEntry* sa = (SpriteEntry*)a;
-    SpriteEntry* sb = (SpriteEntry*)b;
-    return (sb->x - sa->x);
-}
+SpriteEntry sprite_buffer[SPRITE_BUFFER_SIZE];
 
 void update_bg_win();
 void update_sprites();
@@ -34,6 +26,7 @@ uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
 
 //Useful for sprite priority
 #define COLOR_0 0xE0F8D0
+
 
 #define SET_STAT_STATE(F)              \
 do {                                   \
@@ -63,8 +56,8 @@ void ppu_init()
     ppu.cycles = 0;
     ppu.pixel = 0;
 
-    sprite_fetcher.inprogress = false;
-    bg_win_fetcher.inprogress = true;
+    sprite_fetcher.full_fifo = false;
+    bg_win_fetcher.full_fifo = false;
 
     bg_win_fetcher.window_line_counter = false;
     
@@ -109,9 +102,8 @@ void ppu_cycle()
             //update_fifo twice (for now) to match the 4 Tcycles each ppu cycle 
             //consumes
 
-            if(sprite_buffer[sprite_buffer_index].x <= ppu.pixel && sprite_buffer_index >= 0) {
+            if((sprite_buffer[sprite_buffer_index].x <= ppu.pixel + 8) && (sprite_buffer_index < SPRITE_BUFFER_SIZE)) {
                 update_sprites();
-                update_bg_win();
                 bg_win_fetcher.state = Fetch_Tile_Num;
             } 
             else {
@@ -119,7 +111,7 @@ void ppu_cycle()
                 update_bg_win();
             }
             
-            if(!bg_win_fetcher.inprogress && !sprite_fetcher.inprogress) {
+            if(bg_win_fetcher.full_fifo || sprite_fetcher.full_fifo) {
                 shift_pixels();
             }
 
@@ -166,10 +158,7 @@ void ppu_cycle()
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
                     bg_win_fetcher.window_line_counter = 0;
-                    bg_win_fetcher.state = Fetch_Tile_Num;
-                    bg_win_fetcher.inprogress = false;
-                    sprite_fetcher.state = Fetch_Tile_Num;
-                    sprite_fetcher.inprogress = false;
+                    fetchers_reset();
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 
                     ppu.can_render = true;
@@ -215,10 +204,18 @@ void shift_pixels()
         }
     }
 
-    for(int i = 0; i < 8; i++) {
-        // Reset fifos
-        sprite_fetcher.fifo[i] = COLOR_0;
-        bg_win_fetcher.fifo[i] = COLOR_0;
+    // We need to reset fifos that were shifted from
+    if(sprite_fetcher.full_fifo) {
+        for(int i = 0; i < 8; i++) {
+            sprite_fetcher.fifo[i] = COLOR_0;
+        }
+        sprite_fetcher.full_fifo = false;
+    }
+    if(bg_win_fetcher.full_fifo) {
+        for(int i = 0; i < 8; i++) {
+            bg_win_fetcher.fifo[i] = COLOR_0;
+        }
+        bg_win_fetcher.full_fifo = false;
     }
 }
 
@@ -226,12 +223,17 @@ void fetchers_reset()
 {
     bg_win_fetcher.state = Fetch_Tile_Num;
     sprite_fetcher.state = Fetch_Tile_Num;
+    bg_win_fetcher.full_fifo = false;
+    sprite_fetcher.full_fifo = false;
     ppu.pixel = 0;
     ppu.is_window = false;
 }
 
 void update_bg_win() 
 {    
+    if(bg_win_fetcher.full_fifo == true) {
+        return ;
+    }
     byte ly = mem_read(LY);
     byte wx = mem_read(WX) - 7;
     //byte wy = mem_read(WY);
@@ -240,8 +242,6 @@ void update_bg_win()
 
     switch(bg_win_fetcher.state) {
         case Fetch_Tile_Num : {
-            bg_win_fetcher.inprogress = true;
-
             get_bg_win_tilemap_tiledata(); //we need to update every tile
 
             word xoffset = ((ppu.pixel + scx) / 8) & 0x1F;
@@ -301,13 +301,37 @@ void update_bg_win()
                 }
                 bg_win_fetcher.fifo[x] = color;
             }
-            bg_win_fetcher.inprogress = false;
+            bg_win_fetcher.full_fifo = true;
 
             bg_win_fetcher.state = Fetch_Tile_Num;
         } break;
 
         default : break;
     }
+}
+
+void swap(SpriteEntry* a, SpriteEntry* b)
+{
+    SpriteEntry c;
+
+    c = *a;
+    *a = *b;
+    *b = c;
+}
+
+void sort_sprites()
+{
+    int i, swapped;
+
+    do {
+        swapped = 0;
+        for(i = 0; i < SPRITE_BUFFER_SIZE - 1; i++) {
+            if(sprite_buffer[i].x >sprite_buffer[i+1].x) {
+                swap(&sprite_buffer[i], &sprite_buffer[i+1]);
+                swapped = 1;
+            }
+        }
+    } while(swapped);
 }
 
 //
@@ -317,9 +341,8 @@ void populate_sprite_buffer()
 {
     sprite_buffer_index = 0; 
     word base = 0xFE00;
-    byte height = mem_read(LCDC) & (1<<2) ? 16 : 8;
 
-    for(int i = 0; i < 40; i++) {
+    for(int i = 0; i < 40 ; i++) {
         word offset = base + (i * 4);
         byte y = mem_read(offset) - 16;
         byte x = mem_read(offset + 1) - 8;
@@ -332,15 +355,19 @@ void populate_sprite_buffer()
         }
 
         byte bound = mem_read(LY);
+        byte height = mem_read(LCDC) & (1<<2) ? 16 : 8;
         if((bound >= y) && (bound < y + height) && sprite_buffer_index < 10) {
+            // Store position based on x flip
+ 
             SpriteEntry s = {
                 .y = y,
-                .x = x,
+                .x = x + 8,
                 .tile = tile_no,
                 .flags = flags,
                 .palette = palette,
                 .height = height
             };
+            printf("Sprite with x: %i and y: %i added to buffer\n", s.x, s.y);
             sprite_buffer[sprite_buffer_index++] = s;
         }
     }
@@ -351,8 +378,10 @@ void populate_sprite_buffer()
     }
 
     // Sort our sprite buffer by x position
-    qsort(&sprite_buffer, 10, sizeof(SpriteEntry), comp);
-    sprite_buffer_index = 9; 
+    if(sprite_buffer_index) {
+        sort_sprites();
+    }
+    sprite_buffer_index = 0; 
 }
 
 //
@@ -364,14 +393,14 @@ void populate_sprite_buffer()
 //
 void update_sprites() 
 {
-    if (sprite_buffer_index < 0) return;
+    if (sprite_buffer_index == SPRITE_BUFFER_SIZE || sprite_fetcher.full_fifo == true) { 
+        return;
+    }
 
     SpriteEntry* sprite = &sprite_buffer[sprite_buffer_index];
 
     switch(sprite_fetcher.state) {
         case Fetch_Tile_Num: {
-            sprite_fetcher.inprogress = true;
-
             if(sprite->height == 16) { // Ignore bit 0 for 16 bit high tiles
                 sprite_fetcher.tilenumber = sprite->tile & 0xFE;
             }
@@ -385,7 +414,7 @@ void update_sprites()
         case Fetch_Tile_Data_Low: {
             int line = mem_read(LY) - sprite->y;
             if(sprite_fetcher.flags & (1<<6)) { // Y-Flip
-                line -= (sprite->height - 1); // Need this to incorperate tall sprites
+                line -= (sprite->height - 1);
                 line *= -1;
             }
             word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2);
@@ -397,7 +426,7 @@ void update_sprites()
         case Fetch_Tile_Data_High : {
             int line = mem_read(LY) - sprite->y;
             if(sprite_fetcher.flags & (1<<6)) { // Y-Flip
-                line -= (sprite->height - 1); // Need this to incorperate tall sprites
+                line -= (sprite->height - 1);
                 line *= -1;
             }
             word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2) + 1;
@@ -408,16 +437,18 @@ void update_sprites()
 
         case Push_To_FIFO : {
             for(int x = 7; x >= 0 ; x--) {
-                int color_index = x;
+                int bit_position = x;
+                //Even with no X-Flip we dont place pixels correctly
+                #if 0
                 if(sprite_fetcher.flags & (1<<5)) {
-                    color_index -= 7;
-                    color_index *= -1;
+                    bit_position = 7 - x;  // Correct X-flip mirroring
                 }
-                uint32_t color = get_color(sprite_fetcher.tiledata_high, sprite_fetcher.tiledata_low, color_index);
+                #endif
+                uint32_t color = get_color(sprite_fetcher.tiledata_high, sprite_fetcher.tiledata_low, bit_position);
                 sprite_fetcher.fifo[x] = color;
             }
-            sprite_buffer_index--;
-            sprite_fetcher.inprogress = false;
+            sprite_buffer_index++;
+            sprite_fetcher.full_fifo = true;
 
             sprite_fetcher.state = Fetch_Tile_Num;
         } break;

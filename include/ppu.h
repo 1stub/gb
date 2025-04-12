@@ -37,6 +37,7 @@ typedef struct {
     byte tiledata_high;
     int inprogress;
     uint32_t fifo[8];
+    int full_fifo;
 } BGWinFetcher;
 
 typedef struct {
@@ -49,6 +50,7 @@ typedef struct {
     byte tiledata_high;
     int inprogress;
     uint32_t fifo[8];
+    int full_fifo;
 } SpriteFetcher;
 
 typedef struct {

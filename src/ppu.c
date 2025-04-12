@@ -15,7 +15,7 @@ void update_bg_win();
 void update_sprites();
 void populate_sprite_buffer();
 void get_bg_win_tilemap_tiledata();
-uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
+uint32_t get_color(int bit_position);
 
 #define HBLANK_FLAG 0x00
 #define VBLANK_FLAG 0x01
@@ -24,7 +24,6 @@ uint32_t get_color(byte tile_high, byte tile_low, int bit_position);
 
 //Useful for sprite priority
 #define COLOR_0 0xE0F8D0
-
 
 #define SET_STAT_STATE(F)              \
 do {                                   \
@@ -53,10 +52,6 @@ void ppu_init()
     ppu.is_window = false;
     ppu.cycles = 0;
     ppu.pixel = 0;
-
-    sprite_fetcher.full_fifo = false;
-    bg_win_fetcher.full_fifo = false;
-
     bg_win_fetcher.window_line_counter = 0;
 
     SET_STAT_STATE(OAM_FLAG);
@@ -78,9 +73,9 @@ void ppu_cycle()
     switch(ppu.state) {
         case OAM_Search : { //mode 2
             if(ppu.cycles >= 80) { 
-                //no stat interrupt for transitioning to pixel transfer
-                // populate_sprite_buffer();
+                populate_sprite_buffer();
 
+                //no stat interrupt for transitioning to pixel transfer
                 ppu.is_window = false;
                 ppu.pixel = 0;
 
@@ -92,6 +87,7 @@ void ppu_cycle()
         case Pixel_Transfer : { //mode 3
             if(ppu.cycles >= 172 + 80) {
                 update_bg_win();
+                update_sprites();
 
                 can_interrupt = (mem_read(STAT) & (1 << 3));
 
@@ -201,7 +197,9 @@ void update_bg_win()
         }    
         
         for(int x = 7; x >= 0; x--) {
-            uint32_t color = get_color(bg_win_fetcher.tiledata_high, bg_win_fetcher.tiledata_low, x);
+            int color_id = ((bg_win_fetcher.tiledata_high >> x) & 1) << 1 |
+            ((bg_win_fetcher.tiledata_low >> x) & 1);
+            uint32_t color = get_color(color_id);
             if(!(mem_read(LCDC) & 0x01)) { // bg/win enable bit
                 color = COLOR_0;
             }
@@ -237,6 +235,11 @@ void sort_sprites()
 
 void populate_sprite_buffer()
 {
+    if(!(mem_read(LCDC) & (1<<1))) {
+        sprite_buffer_index = 0;
+        return;
+    }
+
     sprite_buffer_index = 0; 
     word base = 0xFE00;
 
@@ -254,10 +257,10 @@ void populate_sprite_buffer()
 
         byte bound = mem_read(LY);
         byte height = mem_read(LCDC) & (1<<2) ? 16 : 8;
-        if((bound >= y) && (bound < y + height) && sprite_buffer_index < 10) { 
+        if((bound >= y) && (bound < y + height) && sprite_buffer_index < 10 && x < 160) { 
             SpriteEntry s = {
                 .y = y,
-                .x = x + 8,
+                .x = x,
                 .tile = tile_no,
                 .flags = flags,
                 .palette = palette,
@@ -269,7 +272,7 @@ void populate_sprite_buffer()
     }
 
     // Initialize unused entries to invalid positions
-    for(int i = sprite_buffer_index; i < 10; i++) {
+    for(int i = sprite_buffer_index; i < SPRITE_BUFFER_SIZE; i++) {
         sprite_buffer[i].x = 0xFF;
     }
 
@@ -277,7 +280,6 @@ void populate_sprite_buffer()
     if(sprite_buffer_index) {
         sort_sprites();
     }
-    sprite_buffer_index = 0; 
 }
 
 //
@@ -288,73 +290,58 @@ void populate_sprite_buffer()
 //
 void update_sprites() 
 {
-    if (sprite_buffer_index == SPRITE_BUFFER_SIZE || sprite_fetcher.full_fifo == true) { 
-        return;
-    }
+    // Useful for OBJ-OBJ priority
+    int pixel_drawn[160] = {false};
 
-    SpriteEntry* sprite = &sprite_buffer[sprite_buffer_index];
-    static int x = 7; // So we can render more than once sprite in a tile
+    for(int x = 0; x < sprite_buffer_index; x++) {
+        SpriteEntry* sprite = &sprite_buffer[x];
+        if(sprite->height == 16) { // Ignore bit 0 for 16 bit high tiles
+            sprite_fetcher.tilenumber = sprite->tile & 0xFE;
+        }
+        else {
+            sprite_fetcher.tilenumber = sprite->tile;
+        }
+    
+        int line = mem_read(LY) - sprite->y;
+        if(sprite->flags & (1<<6)) { // Y-Flip
+            line -= (sprite->height - 1);
+            line *= -1;
+        }
+        word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2);
+        sprite_fetcher.tiledata_low = mem_read(addr++);
+        sprite_fetcher.tiledata_high = mem_read(addr);
 
-    switch(sprite_fetcher.state) {
-        case Fetch_Tile_Num: {
-            if(sprite->height == 16) { // Ignore bit 0 for 16 bit high tiles
-                sprite_fetcher.tilenumber = sprite->tile & 0xFE;
+        for(int x = 7; x >= 0; x--) {
+            int screen_x = sprite->x + (7 - x);
+            if(pixel_drawn[screen_x]) {
+                continue;
             }
+
+            int bit_position = x;
+            if(sprite->flags & (1<<5)) {
+                bit_position -= 7; 
+                bit_position *= -1;
+            }
+
+            int color_id = ((sprite_fetcher.tiledata_high >> bit_position) & 1) << 1 |
+                          ((sprite_fetcher.tiledata_low >> bit_position) & 1);
+            int palette_color = (sprite->palette >> (color_id * 2)) & 0x03;
+
+            uint32_t color = get_color(palette_color);
+            if(color == COLOR_0 && !(sprite->flags & (1<<7))) { // Our buffer already has data, just skip transparent 
+                continue;
+            }
+            if(sprite->flags & (1<<7)) {
+                if(ppu.pixel_buffer[mem_read(LY)][screen_x] == COLOR_0) {
+                    ppu.pixel_buffer[mem_read(LY)][screen_x] = color;
+                    pixel_drawn[screen_x] = true;
+                }
+            } 
             else {
-                sprite_fetcher.tilenumber = sprite->tile;
+                ppu.pixel_buffer[mem_read(LY)][screen_x] = color;
+                pixel_drawn[screen_x] = true;
             }
-            sprite_fetcher.flags = sprite->flags;
-            sprite_fetcher.state = Fetch_Tile_Data_Low;
-        } break;
-        
-        case Fetch_Tile_Data_Low: {
-            int line = mem_read(LY) - sprite->y;
-            if(sprite_fetcher.flags & (1<<6)) { // Y-Flip
-                line -= (sprite->height - 1);
-                line *= -1;
-            }
-            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2);
-            sprite_fetcher.tiledata_low = mem_read(addr);
-
-            sprite_fetcher.state = Fetch_Tile_Data_High;
-        } break;
-        
-        case Fetch_Tile_Data_High : {
-            int line = mem_read(LY) - sprite->y;
-            if(sprite_fetcher.flags & (1<<6)) { // Y-Flip
-                line -= (sprite->height - 1);
-                line *= -1;
-            }
-            word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2) + 1;
-            sprite_fetcher.tiledata_high = mem_read(addr);
-
-            sprite_fetcher.state = Push_To_FIFO;
-        } break;
-
-        case Push_To_FIFO : {
-            for( ; x >= 0; x--) {
-                // Render multiple sprite per tile
-                if(sprite_buffer[sprite_buffer_index + 1].x > ppu.pixel + 8 + (7 - x)) {
-                    sprite_buffer_index++;
-                    sprite_fetcher.state = Fetch_Tile_Num;
-                    return ;
-                }
-                int bit_position = x;
-                if(sprite_fetcher.flags & (1<<5)) {
-                   bit_position -= 7; 
-                   bit_position *= -1;
-                }
-                uint32_t color = get_color(sprite_fetcher.tiledata_high, sprite_fetcher.tiledata_low, bit_position);
-                sprite_fetcher.fifo[x] = color;
-            }
-            x = 7;
-            sprite_buffer_index++;
-            sprite_fetcher.full_fifo = true;
-
-            sprite_fetcher.state = Fetch_Tile_Num;
-        } break;
-
-        default : break;
+        }
     }
 }
 
@@ -398,13 +385,10 @@ void get_bg_win_tilemap_tiledata()
     }
 }
 
-uint32_t get_color(byte tile_high, byte tile_low, int bit_position) 
+uint32_t get_color(int color_index) 
 { 
-    int color_id = ((tile_high >> bit_position) & 0x01) |
-        ((tile_low >> bit_position) & 0x01) << 1;
-
     //https://lospec.com/palette-list/nintendo-gameboy-bgb
-    switch (color_id) {
+    switch (color_index) {
         case 0: return COLOR_0; // white
         case 1: return 0x88C070; // Light gray
         case 2: return 0x346856; // Dark gray

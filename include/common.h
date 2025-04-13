@@ -12,9 +12,6 @@ typedef unsigned char byte;
 #define GB_DISPLAY_WIDTH 160
 #define GB_DISPLAY_HEIGHT 144
 
-#define WINDOW_WIDTH 512
-#define WINDOW_HEIGHT 512
-
 #define JOYP 0xFF00
 #define SB   0xFF01
 #define SC   0xFF02

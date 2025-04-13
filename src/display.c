@@ -11,7 +11,9 @@ SDL_Renderer* renderer = NULL;
 SDL_Event e;
 int win_height, win_width;
 
-#define WINDOW_SCALE 3
+#define WINDOW_SCALE 4
+#define WINDOW_WIDTH (GB_DISPLAY_WIDTH * WINDOW_SCALE)
+#define WINDOW_HEIGHT (GB_DISPLAY_HEIGHT * WINDOW_SCALE)
 
 #define HANDLE_DEBUGGER_INPUT() \
 do {\
@@ -69,7 +71,7 @@ void setup_display()
     //Not confident on renderer accelerated being necessary
     renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
     gb = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
-        SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH * WINDOW_SCALE, GB_DISPLAY_HEIGHT * WINDOW_SCALE);
+        SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT);
     
     if(GB_ENABLE_DEBUGGER) {
         init_debugger(win);
@@ -78,12 +80,12 @@ void setup_display()
 
 void render_texture()
 {
-    SDL_Rect destRect = {
-        10, 10, 
-        GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT    
+    SDL_Rect dest_rect = {
+        0, 0, 
+        WINDOW_WIDTH, WINDOW_HEIGHT    
     };
 
-    SDL_RenderCopy(renderer, gb, NULL, &destRect);
+    SDL_RenderCopy(renderer, gb, NULL, &dest_rect);
 }
 
 void render_pixel_buffer()

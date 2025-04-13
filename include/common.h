@@ -1,7 +1,7 @@
 #pragma once
 
-#define GB_ENABLE_DEBUGGER
-#define GB_ENABLE_JSON_TESTIN
+#define GB_ENABLE_DEBUGGER 0
+#define GB_ENABLE_JSON_TESTING 0
 
 #define true 1
 #define false 0

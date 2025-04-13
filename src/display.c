@@ -11,6 +11,35 @@ SDL_Renderer* renderer = NULL;
 SDL_Event e;
 int win_height, win_width;
 
+#define WINDOW_SCALE 3
+
+#define HANDLE_DEBUGGER_INPUT() \
+do {\
+    debugger_start_input();\
+    while( SDL_PollEvent( &e ) ) {\
+        debugger_poll_input(&e);\
+        switch(e.type) {\
+            case SDL_QUIT: {\
+                cleanup();\
+                *quit = 1;\
+            }\
+            break;\
+            case SDL_KEYDOWN: {\
+            }\
+            break;\
+            case SDL_KEYUP: {\
+            }\
+            break;\
+            default: break;\
+        }\
+    }\
+    debugger_end_input();\
+} while(0);
+
+//
+// NOTE: It would be way better if we didnt use if stmts to enable/disable debugger but rather pound define
+// all debugger methods so we dont emit any code for it when disabled. Would be good for json tests aswell.
+//
 void cleanup();
 
 void setup_display() 
@@ -40,9 +69,11 @@ void setup_display()
     //Not confident on renderer accelerated being necessary
     renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
     gb = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
-        SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT);
-
-    init_debugger(win);
+        SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH * WINDOW_SCALE, GB_DISPLAY_HEIGHT * WINDOW_SCALE);
+    
+    if(GB_ENABLE_DEBUGGER) {
+        init_debugger(win);
+    }
 }
 
 void render_texture()
@@ -77,29 +108,32 @@ void render_pixel_buffer()
 
 void update_display(int* quit) 
 {
-    debugger_start_input();
-    while( SDL_PollEvent( &e ) ) { 
-        debugger_poll_input(&e);
-        switch(e.type) {
-            case SDL_QUIT: {
-                cleanup();
-                *quit = 1;
+    // Probably could handle this a bit cleaner
+    if(GB_ENABLE_DEBUGGER) {
+        HANDLE_DEBUGGER_INPUT();
+    }
+    else {
+        while( SDL_PollEvent( &e ) ) { 
+            switch(e.type) {
+                case SDL_QUIT: {
+                    cleanup();
+                    *quit = 1;
+                }
+                break;
+                case SDL_KEYDOWN: { 
+    
+                }
+                break;
+    
+                case SDL_KEYUP: {
+    
+                }
+                break;
+    
+                default: break;
             }
-            break;
-            case SDL_KEYDOWN: { 
-
-            }
-            break;
-
-            case SDL_KEYUP: {
-
-            }
-            break;
-
-            default: break;
         }
     }
-    debugger_end_input();
 
     //
     //Need to be careful with rendering order. We dont want to clear our pixel buffer display,
@@ -108,12 +142,17 @@ void update_display(int* quit)
     if(ppu.can_render) {
         SDL_GetWindowSize(win, &win_width, &win_height);
         glViewport(0, 0, win_width, win_height);
-        clearGLColorNuklear();  //Clears whole display
+
+        if(GB_ENABLE_DEBUGGER) {
+            clearGLColorNuklear();  //Clears whole display
+        }
 
         render_pixel_buffer();
         ppu.can_render = 0; 
     
-        render_debugger();
+        if(GB_ENABLE_DEBUGGER) {
+            render_debugger();
+        }
 
         SDL_GL_SwapWindow(win);
     }
@@ -121,7 +160,9 @@ void update_display(int* quit)
 
 void cleanup() 
 {
-    cleanup_debugger();
+    if(GB_ENABLE_DEBUGGER) {
+        cleanup_debugger();
+    }
     SDL_DestroyWindow(win);
     SDL_Quit();
 }

@@ -70,6 +70,9 @@
         "locale": "cpp",
         "queue": "cpp",
         "stack": "cpp",
-        "deque": "c"
+        "deque": "c",
+        "ranges": "c",
+        "forward_list": "c",
+        "future": "c"
     }
 }

@@ -4,8 +4,8 @@
 #include "../include/interrupt.h"
 
 PPU ppu;
-BGWinFetcher bg_win_fetcher;
-SpriteFetcher sprite_fetcher;
+Renderer sprites;
+Renderer bg_win;
 
 #define SPRITE_BUFFER_SIZE 10
 int sprite_buffer_index = 0;
@@ -52,7 +52,7 @@ void ppu_init()
     ppu.is_window = false;
     ppu.cycles = 0;
     ppu.pixel = 0;
-    bg_win_fetcher.window_line_counter = 0;
+    ppu.window_line_counter = 0;
 
     SET_STAT_STATE(OAM_FLAG);
 }
@@ -114,7 +114,7 @@ void ppu_cycle()
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //oam search interrupt
 
                     if(ppu.is_window) {
-                        bg_win_fetcher.window_line_counter++;
+                        ppu.window_line_counter++;
                     }
 
                     SET_STAT_STATE(OAM_FLAG);
@@ -130,7 +130,7 @@ void ppu_cycle()
 
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
-                    bg_win_fetcher.window_line_counter = 0;
+                    ppu.window_line_counter = 0;
 
                     ppu.is_window = false;
                     ppu.can_render = true;
@@ -149,7 +149,6 @@ void ppu_cycle()
 
     if(can_interrupt) {
         request_interrupt(1);
-        printf("stat int from ppu\n");
     }
 
     ppu.cycles += 4;
@@ -171,34 +170,34 @@ void update_bg_win()
 
         if(ppu.is_window) {
             xoffset = ((ppu.pixel - (mem_read(WX) - 7)) / 8) & 0x1F;
-            yoffset = 32 * (bg_win_fetcher.window_line_counter / 8);
+            yoffset = 32 * (ppu.window_line_counter / 8);
         }
 
         word tile_num_base = (xoffset + yoffset) & 0x3FF;
-        if(bg_win_fetcher.is_unsigned) {
-            bg_win_fetcher.tilenumber = (byte)mem_read(bg_win_fetcher.tilemap + tile_num_base);
+        if(ppu.is_unsigned) {
+            bg_win.tilenumber = (byte)mem_read(bg_win.tilemap + tile_num_base);
         }
         else {
-            bg_win_fetcher.tilenumber = (int8_t)mem_read(bg_win_fetcher.tilemap + tile_num_base);
+            bg_win.tilenumber = (int8_t)mem_read(bg_win.tilemap + tile_num_base);
         }
 
         word tile_data_base = (2 * ((mem_read(LY) + mem_read(SCY)) % 8));
         if(ppu.is_window) {
-            tile_data_base = (2 * (bg_win_fetcher.window_line_counter % 8));
+            tile_data_base = (2 * (ppu.window_line_counter % 8));
         }
 
-        if(bg_win_fetcher.is_unsigned) {
-            bg_win_fetcher.tiledata_low = mem_read(tile_data_base + bg_win_fetcher.tiledata + (bg_win_fetcher.tilenumber * 16));
-            bg_win_fetcher.tiledata_high = mem_read(tile_data_base + bg_win_fetcher.tiledata + (bg_win_fetcher.tilenumber * 16) + 1);
+        if(ppu.is_unsigned) {
+            bg_win.tiledata_low = mem_read(tile_data_base + bg_win.tiledata + (bg_win.tilenumber * 16));
+            bg_win.tiledata_high = mem_read(tile_data_base + bg_win.tiledata + (bg_win.tilenumber * 16) + 1);
         }
         else{
-            bg_win_fetcher.tiledata_low = mem_read(tile_data_base + bg_win_fetcher.tiledata + ((bg_win_fetcher.tilenumber+128) * 16));
-            bg_win_fetcher.tiledata_high = mem_read(tile_data_base + bg_win_fetcher.tiledata + ((bg_win_fetcher.tilenumber+128) * 16) + 1);
+            bg_win.tiledata_low = mem_read(tile_data_base + bg_win.tiledata + ((bg_win.tilenumber+128) * 16));
+            bg_win.tiledata_high = mem_read(tile_data_base + bg_win.tiledata + ((bg_win.tilenumber+128) * 16) + 1);
         }    
         
         for(int x = 7; x >= 0; x--) {
-            int color_id = ((bg_win_fetcher.tiledata_high >> x) & 1) << 1 |
-            ((bg_win_fetcher.tiledata_low >> x) & 1);
+            int color_id = ((bg_win.tiledata_high >> x) & 1) << 1 |
+                ((bg_win.tiledata_low >> x) & 1);
             uint32_t color = get_color(color_id);
             if(!(mem_read(LCDC) & 0x01)) { // bg/win enable bit
                 color = COLOR_0;
@@ -266,7 +265,6 @@ void populate_sprite_buffer()
                 .palette = palette,
                 .height = height
             };
-            printf("Sprite with x: %i and y: %i added to buffer\n", s.x, s.y);
             sprite_buffer[sprite_buffer_index++] = s;
         }
     }
@@ -296,10 +294,10 @@ void update_sprites()
     for(int x = 0; x < sprite_buffer_index; x++) {
         SpriteEntry* sprite = &sprite_buffer[x];
         if(sprite->height == 16) { // Ignore bit 0 for 16 bit high tiles
-            sprite_fetcher.tilenumber = sprite->tile & 0xFE;
+            sprites.tilenumber = sprite->tile & 0xFE;
         }
         else {
-            sprite_fetcher.tilenumber = sprite->tile;
+            sprites.tilenumber = sprite->tile;
         }
     
         int line = mem_read(LY) - sprite->y;
@@ -307,9 +305,9 @@ void update_sprites()
             line -= (sprite->height - 1);
             line *= -1;
         }
-        word addr = 0x8000 + (sprite_fetcher.tilenumber * 16) + (line * 2);
-        sprite_fetcher.tiledata_low = mem_read(addr++);
-        sprite_fetcher.tiledata_high = mem_read(addr);
+        word addr = 0x8000 + (sprites.tilenumber * 16) + (line * 2);
+        sprites.tiledata_low = mem_read(addr++);
+        sprites.tiledata_high = mem_read(addr);
 
         for(int x = 7; x >= 0; x--) {
             int screen_x = sprite->x + (7 - x);
@@ -323,8 +321,8 @@ void update_sprites()
                 bit_position *= -1;
             }
 
-            int color_id = ((sprite_fetcher.tiledata_high >> bit_position) & 1) << 1 |
-                          ((sprite_fetcher.tiledata_low >> bit_position) & 1);
+            int color_id = ((sprites.tiledata_high >> bit_position) & 1) << 1 |
+                          ((sprites.tiledata_low >> bit_position) & 1);
             int palette_color = (sprite->palette >> (color_id * 2)) & 0x03;
 
             uint32_t color = get_color(palette_color);
@@ -347,10 +345,10 @@ void update_sprites()
 
 void get_bg_win_tilemap_tiledata()
 {
-    bg_win_fetcher.tilemap = 0x9800;
+    bg_win.tilemap = 0x9800;
     //default to 8800 method 
-    bg_win_fetcher.tiledata = 0x8800;
-    bg_win_fetcher.is_unsigned = false;
+    bg_win.tiledata = 0x8800;
+    ppu.is_unsigned = false;
     ppu.is_window = false;
 
     byte lcdc = mem_read(LCDC);
@@ -368,19 +366,19 @@ void get_bg_win_tilemap_tiledata()
 
     if(lcdc & (1 << 4)) {
         //8000 method
-        bg_win_fetcher.is_unsigned = true;
-        bg_win_fetcher.tiledata = 0x8000;
+        ppu.is_unsigned = true;
+        bg_win.tiledata = 0x8000;
     }
 
     if(!ppu.is_window) {
         //are we rendering the background?
         if(lcdc & (1 << 3)) {
-            bg_win_fetcher.tilemap = 0x9C00;
+            bg_win.tilemap = 0x9C00;
         }
     }   
     else {
         if(lcdc & (1 << 6)) {
-            bg_win_fetcher.tilemap = 0x9C00;
+            bg_win.tilemap = 0x9C00;
         }
     }
 }

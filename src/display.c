@@ -1,6 +1,7 @@
 #include "../include/display.h"
 #include "../include/debugger.h"
 #include "../include/ppu.h"
+#include "../include/joypad.h"
 
 #include <SDL/SDL_opengl.h>
 #include <assert.h>
@@ -123,12 +124,12 @@ void update_display(int* quit)
                 }
                 break;
                 case SDL_KEYDOWN: { 
-    
+                    key_pressed(keymap(e.key.keysym.sym));
                 }
                 break;
     
                 case SDL_KEYUP: {
-    
+                    key_released(keymap(e.key.keysym.sym));
                 }
                 break;
     

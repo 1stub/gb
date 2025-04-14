@@ -106,6 +106,8 @@ void ppu_cycle()
                 if(mem_read(LY) == 144) {
                     can_interrupt = (mem_read(STAT) & (1 << 4)); //vblank interrupt in stat
 
+                    ppu.can_render = true;
+
                     request_interrupt(0);
                     SET_STAT_STATE(VBLANK_FLAG);
                     ppu.state = VBlank;
@@ -133,7 +135,6 @@ void ppu_cycle()
                     ppu.window_line_counter = 0;
 
                     ppu.is_window = false;
-                    ppu.can_render = true;
 
                     can_interrupt = (mem_read(STAT) & (1 << 5)); //test for oam search interrupt
 

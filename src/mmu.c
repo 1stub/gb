@@ -1,6 +1,7 @@
 #include "../include/mmu.h"
 #include "../include/cpu.h"
 #include "../include/interrupt.h"
+#include "../include/joypad.h"
 #include <string.h>
 
 #define MEM mmu.memory 
@@ -38,15 +39,18 @@ void mmu_init(){
     MEM[SCX]  = 0x00 ;
     MEM[LYC]  = 0x00 ;
     MEM[BGP]  = 0xFC ;
+    MEM[JOYP] = 0xFF ;
     MEM[OBP0] = 0xFF ;
     MEM[OBP1] = 0xFF ;
-    MEM[JOYP] = 0xFF;
     MEM[0xFF4A] = 0x00 ;
     MEM[0xFF4B] = 0x00 ;
     MEM[IE] = 0x00 ;
 }
 
 byte mem_read(word address){
+    if(address == JOYP) {
+        update_joypad();
+    }
     return MEM[address];
 }
 

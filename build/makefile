@@ -7,7 +7,7 @@ UTIL_DIR=$(MAKE_PATH)/../util/
 OUT_EXE=$(BUILD_DIR)output/
 OUT_OBJ=$(BUILD_DIR)output/obj/
 
-BUILD := dev
+BUILD := release
 
 CC=gcc
 CXX=g++
@@ -16,7 +16,7 @@ CXX=g++
 CFLAGS=-std=c23 -Wall -Wextra -Wno-unused-parameter -Wuninitialized -Werror -pedantic $(shell sdl2-config --cflags)
 CFLAGS_OPT.debug=-O0 -g3 -ggdb -fno-omit-frame-pointer
 CFLAGS_OPT.dev=-O0 -g3 -ggdb -fno-omit-frame-pointer
-CFLAGS_OPT.release=-O3 -fno-omit-frame-pointer -march=x86-64-v3
+CFLAGS_OPT.release=-O2 -fno-omit-frame-pointer -march=x86-64-v3
 CFLAGS+=$(CFLAGS_OPT.$(BUILD))
 
 # C++-specific flags

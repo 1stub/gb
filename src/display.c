@@ -124,12 +124,12 @@ void update_display(int* quit)
                 }
                 break;
                 case SDL_KEYDOWN: { 
-                    key_pressed();
+                    key_pressed(keymap(e.key.keysym.sym));
                 }
                 break;
     
                 case SDL_KEYUP: {
-                    key_released();
+                    key_released(keymap(e.key.keysym.sym));
                 }
                 break;
     

@@ -3,7 +3,7 @@
 #include "../include/emulate.h"
 
 void emulate() {
-    int quit = 0;
+    int quit = false;
 
     //
     //A quite important TODO is to make sure we only update the display
@@ -25,7 +25,10 @@ void emulate() {
         update_timers();
         do_interrupts();
         ppu_cycle();
-        update_display(&quit);
+        if(ppu.can_render) {
+            poll_joypad_input(&quit);
+            update_display(&quit);
+        }
         printf("%c", perform_serial());
     }
 }

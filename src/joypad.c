@@ -3,7 +3,38 @@
 #include "../include/interrupt.h"
 #include "../include/mmu.h"
 
-byte joypad_state = 0x00;
+#include <SDL2/SDL.h>
+
+byte joypad_state = 0xFF;
+SDL_Event e;
+
+//
+// Looks like the main issue is performance while polling for input.
+// See https://stackoverflow.com/questions/58639564/why-is-sdl-pollevent-so-slow
+// This likely warrants a switch to SDL3.
+//
+void poll_joypad_input(int* quit)
+{
+    while( SDL_PollEvent( &e ) ) { 
+        switch(e.type) {
+            case SDL_QUIT: {
+                *quit = 1;
+            }
+            break;
+            case SDL_KEYDOWN: { 
+                key_pressed(keymap(e.key.keysym.sym));
+            }
+            break;
+
+            case SDL_KEYUP: {
+                key_released(keymap(e.key.keysym.sym));
+            }
+            break;
+
+            default: break;
+        }
+    }
+}
 
 void key_pressed(int keynum)
 {
@@ -62,9 +93,9 @@ void update_joypad()
 int keymap(unsigned char k) {
     switch (k) {
         case 'w': return 0x02;
-        case 'd': return 0x01;
+        case 'a': return 0x01;
         case 's': return 0x03;
-        case 'a': return 0x00;
+        case 'd': return 0x00;
 
         case 'k': return 0x04;
         case 'l': return 0x05;

@@ -40,7 +40,6 @@ void mmu_init(){
     MEM[BGP]  = 0xFC ;
     MEM[OBP0] = 0xFF ;
     MEM[OBP1] = 0xFF ;
-    MEM[JOYP] = 0xFF;
     MEM[0xFF4A] = 0x00 ;
     MEM[0xFF4B] = 0x00 ;
     MEM[IE] = 0x00 ;

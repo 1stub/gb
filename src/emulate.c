@@ -1,31 +1,42 @@
 #include "stdio.h"
+#include <SDL2/SDL.h>
 
 #include "../include/emulate.h"
 
+//
+// Something kinda odd is even though the timing feels right
+// it is very clear we are rendering at ~30fps rather than 60.
+// Will need to give this a better look
+//
+
 void emulate() {
-    int quit = 0;
-
+    int quit = false;
     //
-    //A quite important TODO is to make sure we only update the display
-    //~60 times a second. Right now we try to render as frequently as 
-    //possible which leads to a super slow display; Maybe use some
-    //sort of simple timer that triggers once a certain number of hz 
-    //have elapsed and then resets after we display? idk. We also need
-    //to always have the debugger update even when we are not rendering
-    //the actual display pixels.
+    // This number should be 16 ms but it appears we are
+    // runnign 4x speed at 16ms per frame
     //
-
-    //
-    //TODO: need to actually understand why this emulation order works
-    //and my prev approach of doing exec, render, timer, int did not
-    //
+    const Uint32 frame_delay = 64; // Force 60fps
+    Uint32 frame_start;
+    Uint32 frame_time;
+    
     while(!quit) {
-        //Order here is VERY important
-        cpu_cycle();
-        update_timers();
-        do_interrupts();
-        ppu_cycle();
+        frame_start = SDL_GetTicks();
+        
+        // Render full frame first then handle inputs
+        for (int i = 0; i < 70224; i++) { 
+            cpu_cycle();
+            update_timers();
+            do_interrupts();
+            ppu_cycle();
+        }
+        
+        poll_joypad_input(&quit);
         update_display(&quit);
-        printf("%c", perform_serial());
+        // printf("%c", perform_serial());
+        
+        frame_time = SDL_GetTicks() - frame_start;
+        if (frame_time < frame_delay) {
+            SDL_Delay(frame_delay - frame_time);
+        }
     }
 }

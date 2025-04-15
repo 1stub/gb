@@ -1,8 +1,8 @@
 # gb
-dmg gameboy emulator
+A DMG GameBoy emulator written in modern C. This is not intended to be an accurate representation of GameBoy hardware, rather my attempt and making all fundamental aspects of gameboy functionality understandable and hopefully this could serve as a nice reference for other emulator developers.
 
-### TODO:
-* [ x ] Start by passing all sm83 json tests
-* [ ] Get blargg tests passing
-* [ ] Write a debugger menu using SDL
-* [ ] Timers to be done cycle accurately and elegantly (kinda vauge)
+## Screenshots
+| DMG-ACID2 |   Catrap   |
+| -------------------------|------------------------|
+| ![DMG-ACID2](pics/dmgacid.png) | ![Catrap](pics/catrap.png)|
+

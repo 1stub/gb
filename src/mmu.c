@@ -49,9 +49,11 @@ void mmu_init(){
 
 byte mem_read(word address){
     if(address == JOYP) {
-        update_joypad();
+        return update_joypad();
     }
-    return MEM[address];
+    else {
+        return MEM[address];
+    }
 }
 
 word mem_read16(word address){

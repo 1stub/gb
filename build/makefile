@@ -7,7 +7,7 @@ UTIL_DIR=$(MAKE_PATH)/../util/
 OUT_EXE=$(BUILD_DIR)output/
 OUT_OBJ=$(BUILD_DIR)output/obj/
 
-BUILD := release
+BUILD := dev
 
 CC=gcc
 CXX=g++

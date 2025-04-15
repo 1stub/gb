@@ -3,13 +3,12 @@
 #include "../include/ppu.h"
 #include "../include/joypad.h"
 
-#include <SDL/SDL_opengl.h>
+#include <SDL2/SDL_opengl.h>
 #include <assert.h>
 
 SDL_Window* win = NULL;
 SDL_Texture* gb = NULL;
 SDL_Renderer* renderer = NULL;
-SDL_Event e;
 int win_height, win_width;
 
 #define WINDOW_SCALE 4
@@ -79,86 +78,32 @@ void setup_display()
     }
 }
 
-void render_texture()
-{
-    SDL_Rect dest_rect = {
-        0, 0, 
-        WINDOW_WIDTH, WINDOW_HEIGHT    
-    };
-
-    SDL_RenderCopy(renderer, gb, NULL, &dest_rect);
-}
-
 void render_pixel_buffer()
 {
-    void* pixels;
-    int pitch;
-
-    //Lock the texture to get a pointer to its pixel data
-    SDL_LockTexture(gb, NULL, &pixels, &pitch);
-
-    uint32_t* dst = (uint32_t*)pixels;
-    for (int y = 0; y < 144; y++) {
-        memcpy(dst, ppu.pixel_buffer[y], 160 * sizeof(uint32_t));
-        dst += pitch / sizeof(uint32_t); 
-    }
-
-    //Unlocking updates our new texture changes
-    SDL_UnlockTexture(gb);
-
-    render_texture();
+    SDL_RenderClear(renderer);
+    SDL_UpdateTexture(gb, NULL, ppu.pixel_buffer, 160 * sizeof(uint32_t));
+    SDL_RenderCopy(renderer, gb, NULL, NULL);
+    SDL_RenderPresent(renderer);
 }
 
 void update_display(int* quit) 
 {
-    // Probably could handle this a bit cleaner
+    if(*quit) {
+        cleanup();
+        return ;
+    }
     if(GB_ENABLE_DEBUGGER) {
-        HANDLE_DEBUGGER_INPUT();
-    }
-    else {
-        while( SDL_PollEvent( &e ) ) { 
-            switch(e.type) {
-                case SDL_QUIT: {
-                    cleanup();
-                    *quit = 1;
-                }
-                break;
-                case SDL_KEYDOWN: { 
-                    key_pressed(keymap(e.key.keysym.sym));
-                }
-                break;
-    
-                case SDL_KEYUP: {
-                    key_released(keymap(e.key.keysym.sym));
-                }
-                break;
-    
-                default: break;
-            }
-        }
+        clearGLColorNuklear();  //Clears whole display
     }
 
-    //
-    //Need to be careful with rendering order. We dont want to clear our pixel buffer display,
-    //but we do want to clear the debugger
-    //
-    if(ppu.can_render) {
-        SDL_GetWindowSize(win, &win_width, &win_height);
-        glViewport(0, 0, win_width, win_height);
+    render_pixel_buffer();
+    ppu.can_render = 0; 
 
-        if(GB_ENABLE_DEBUGGER) {
-            clearGLColorNuklear();  //Clears whole display
-        }
-
-        render_pixel_buffer();
-        ppu.can_render = 0; 
-    
-        if(GB_ENABLE_DEBUGGER) {
-            render_debugger();
-        }
-
-        SDL_GL_SwapWindow(win);
+    if(GB_ENABLE_DEBUGGER) {
+        render_debugger();
     }
+
+    SDL_GL_SwapWindow(win);
 }
 
 void cleanup() 

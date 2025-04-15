@@ -6,5 +6,6 @@
 #include "cpu.h"
 #include "interrupt.h"
 #include "mmu.h"
+#include "joypad.h"
 
 void emulate();

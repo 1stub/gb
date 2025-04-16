@@ -23,7 +23,7 @@ void emulate() {
         frame_start = SDL_GetTicks();
         
         // Render full frame first then handle inputs
-        for (int i = 0; i < 70224; i++) { 
+        for (int i = 0; i <= 70224; i++) { 
             cpu_cycle();
             update_timers();
             do_interrupts();
@@ -32,6 +32,7 @@ void emulate() {
         
         poll_joypad_input(&quit);
         update_display(&quit);
+        print_registers();
         // printf("%c", perform_serial());
         
         frame_time = SDL_GetTicks() - frame_start;

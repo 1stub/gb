@@ -48,6 +48,9 @@ void mmu_init(){
 }
 
 byte mem_read(word address){
+    if(GB_ENABLE_JSON_TESTING) {
+        return MEM[address];
+    }
     if(address == JOYP) {
         return update_joypad();
     }
@@ -62,7 +65,14 @@ word mem_read16(word address){
 
 //TODO: Handle cases where specific bits(or whole registers) are read only
 void mem_write(word address, byte value){
-    if(address == LY) {
+    if(GB_ENABLE_JSON_TESTING) {
+        MEM[address] = value;
+        return ;
+    }
+    if(address <= 0x7FFF) {
+        printf("Attempted to write to ROM!\n");
+    }
+    else if(address == LY) {
         MEM[LY] = 0;
     }
     else if (address == LCDC) {
@@ -90,24 +100,20 @@ void mem_write(word address, byte value){
         mmu.divider_counter = 0;
     }
     else if(address == DMA) {
+        MEM[DMA] = value;
         do_dma(value);
     }
     else if(address == JOYP) {
         // Preserve lower bits (button states) while allowing writes to bits 4 & 5
-        MEM[JOYP] = (value & 0x30) | (MEM[JOYP] & 0xCF);
+        MEM[JOYP] = (value & 0x30);
     }
     else if(address == STAT) {
         // Preserve lower 2 bits (current LCD mode) while allowing writes to other bits
-        MEM[STAT] = (value & 0x7C) | (MEM[STAT] & 0x03);
+        MEM[STAT] = (value & 0xFC) | (MEM[STAT] & 0x03);
     }
     else {
         MEM[address] = value;
     }
-
-    #ifdef GB_ENABLE_JSON_TESTING
-    MEM[address] = value;
-    #endif
-    
 }
 
 void load_rom(char *file){

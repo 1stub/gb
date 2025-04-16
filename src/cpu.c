@@ -47,7 +47,7 @@ void cpu_init()
     DE = 0x00D8;
     HL = 0x014D;
     PC = 0x0100;
-    SP = 0xFFFE; 
+    SP = 0xFFFE;
     IME = 0;
     cpu.cycles = 0;
     cpu.is_halted = 0;

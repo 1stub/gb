@@ -57,14 +57,15 @@ void ppu_init()
     SET_STAT_STATE(OAM_FLAG);
 }
 
-void ppu_cycle() 
+void ppu_cycle(int cycles) 
 {
-    //is LCD enabled?
+    ppu.cycles += cycles;
+
     if (!(mem_read(LCDC) & (1<<7))) {
         ppu.can_render = false;
-        ppu.cycles = 0;
-        ppu.pixel = 0;
-        mem_write(LY, 0);
+        if(ppu.cycles > 70224) {
+            ppu.cycles -= 70224;
+        }
         SET_STAT_STATE(VBlank);
         return ;
     }
@@ -73,6 +74,7 @@ void ppu_cycle()
     switch(ppu.state) {
         case OAM_Search : { //mode 2
             if(ppu.cycles >= 80) { 
+                ppu.cycles -= 80;
                 populate_sprite_buffer();
 
                 //no stat interrupt for transitioning to pixel transfer
@@ -85,7 +87,8 @@ void ppu_cycle()
         } break;
 
         case Pixel_Transfer : { //mode 3
-            if(ppu.cycles >= 172 + 80) {
+            if(ppu.cycles >= 172) {
+                ppu.cycles -= 172;
                 update_bg_win();
                 update_sprites();
 
@@ -97,8 +100,8 @@ void ppu_cycle()
         } break;
 
         case HBlank : { //mode 0
-            if(ppu.cycles >= 456) {
-                ppu.cycles -= 456;
+            if(ppu.cycles >= 204) {
+                ppu.cycles -= 204;
                 mmu.memory[LY]++;
 
                 LY_LYC_COMPARE();
@@ -106,10 +109,9 @@ void ppu_cycle()
                 if(mem_read(LY) == 144) {
                     can_interrupt = (mem_read(STAT) & (1 << 4)); //vblank interrupt in stat
 
-                    ppu.can_render = true;
-
                     request_interrupt(0);
                     SET_STAT_STATE(VBLANK_FLAG);
+                   
                     ppu.state = VBlank;
                 }
                 else {
@@ -132,6 +134,7 @@ void ppu_cycle()
 
                 if(mem_read(LY) == 153) {
                     mem_write(LY, 0);
+                    ppu.can_render = true;
                     ppu.window_line_counter = 0;
 
                     ppu.is_window = false;
@@ -149,10 +152,9 @@ void ppu_cycle()
     }
 
     if(can_interrupt) {
+        // TODO: Handle stat IRQ blocking, may be the source of flickering
         request_interrupt(1);
     }
-
-    ppu.cycles += 4;
 }
 
 //

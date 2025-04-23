@@ -41,5 +41,5 @@ typedef struct {
 extern PPU ppu;
 
 //Our ppu will always just cycle 4 T-Cycles each call
-extern void ppu_cycle();
+extern void ppu_cycle(int cycles);
 extern void ppu_init();

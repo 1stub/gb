@@ -3,12 +3,11 @@
 #include "../include/interrupt.h"
 #include "../include/mmu.h"
 
-//This will operate on the notion our cpu updates ever 4 T-Cycles
-void update_timers() 
+void update_timers(int cycles) 
 {
     static int timer_counter = 0;
 
-    mmu.divider_counter += 4;
+    mmu.divider_counter += cycles;
     if(mmu.divider_counter >= 256) {
         mmu.memory[DIV]++; //dont call write, resets to 0
         mmu.divider_counter -= 256;

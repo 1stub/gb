@@ -63,7 +63,7 @@ byte cpu_cycle()
         return 0;
     }
 
-    if(cpu.cycles > 4) {
+    if(cpu.cycles >= 4) {
         cpu.cycles -= 4;
         return 4;
     }

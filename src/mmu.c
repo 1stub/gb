@@ -70,7 +70,11 @@ void mem_write(word address, byte value){
         return ;
     }
     if(address <= 0x7FFF) {
-        printf("Attempted to write to ROM!\n");
+        //printf("Attempted to write to ROM!\n");
+    }
+    else if (address <= 0xFDFF && address >= 0xE000) {
+        printf("echo!\n");
+        // Eh not sure how to handle properly (echo memory)
     }
     else if(address == LY) {
         MEM[LY] = 0;

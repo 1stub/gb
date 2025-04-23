@@ -97,7 +97,7 @@ void update_display(int* quit)
     }
 
     render_pixel_buffer();
-    ppu.can_render = 0; 
+    ppu.can_render = false; 
 
     if(GB_ENABLE_DEBUGGER) {
         render_debugger();

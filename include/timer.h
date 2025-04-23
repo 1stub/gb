@@ -1,3 +1,3 @@
 #pragma once
 
-void update_timers();
+void update_timers(int cycles);

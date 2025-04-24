@@ -27,31 +27,12 @@ void emulate() {
         // Render full frame first then handle inputs
         int curr_cycles = 0;
         while (curr_cycles < CYCLES_PER_FRAME) { 
-            if (cpu.is_halted) {
-                int cycles = 4;
-                curr_cycles += cycles;
-                update_timers(cycles);
-                ppu_cycle(cycles);
+            update_timers(4);
+            curr_cycles += 4;
 
-                //
-                // This logic will need to be embedded better into cpu 
-                // The issue was our cpu became disabled and never met the condidtion
-                // to unhalt. I will leave this here for now so I dont forget this
-                // behaviour.
-                //
-                if (IME & mmu.memory[0xFF0F] & mmu.memory[0xFFFF] & 0x1F) {
-                    cpu.is_halted = false;
-                }
-
-                do_interrupts();
-            }
-            else {
-                int cycles = cpu_cycle();
-                curr_cycles += cycles;
-                update_timers(4);
-                ppu_cycle(cycles);
-                do_interrupts();
-            }
+            cpu_cycle();
+            ppu_cycle(4);
+            do_interrupts();
             printf("%c", perform_serial());
         }
 

@@ -68,7 +68,7 @@ void ppu_cycle(int cycles)
         }
         SET_STAT_STATE(HBLANK_FLAG);
         mem_write(LY, 0x00);
-        // ppu.pixel = 0;
+        ppu.pixel = 0;
         return ;
     }
 

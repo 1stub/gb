@@ -6,14 +6,8 @@
 #define CYCLES_PER_FRAME 70224
 
 //
-// The issue currently with flickering is related to how our ppu handles
-// being turned off and how this creates issues down the pipeline. There
-// will be slight inconsistencies that appear slowly as we run the ppu
-// and the number of cycles progressively become more and more off.
-//
-// Also catrap decided to fucking break...
-//
-// Maybe current rendering bug is related to STAT IRQ blocking? i didnt implement it
+// Current issue with Dr. Mario is that LCD becomes disabled and never re-enabled. Something to do likely
+// with how we service interrupts.
 //
 
 void emulate() {
@@ -33,33 +27,14 @@ void emulate() {
         // Render full frame first then handle inputs
         int curr_cycles = 0;
         while (curr_cycles < CYCLES_PER_FRAME) { 
-            if (cpu.is_halted) {
-                int cycles = 4;
-                curr_cycles += cycles;
-                update_timers(cycles);
-                ppu_cycle(cycles);
+            update_timers(4);
+            curr_cycles += 4;
 
-                //
-                // This logic will need to be embedded better into cpu 
-                // The issue was our cpu became disabled and never met the condidtion
-                // to unhalt. I will leave this here for now so I dont forget this
-                // behaviour.
-                //
-                if (IME & mmu.memory[0xFF0F] & mmu.memory[0xFFFF] & 0x1F) {
-                    cpu.is_halted = false;
-                }
-
-                do_interrupts();
-            }
-            else {
-                int cycles = cpu_cycle();
-                curr_cycles += cycles;
-                update_timers(4);
-                ppu_cycle(cycles);
-                do_interrupts();
-            }
+            cpu_cycle();
+            ppu_cycle(4);
+            do_interrupts();
+            printf("%c", perform_serial());
         }
-        // printf("%c", perform_serial());
 
         frame_time = SDL_GetTicks() - frame_start;
         if (frame_time < frame_delay) {

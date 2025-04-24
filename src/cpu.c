@@ -63,7 +63,7 @@ byte cpu_cycle()
         return 0;
     }
 
-    if(cpu.cycles >= 4) {
+    if(cpu.cycles > 4) {
         cpu.cycles -= 4;
         return 4;
     }
@@ -83,8 +83,10 @@ byte cpu_cycle()
         if(!IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
             cpu.is_halted = false;
             cpu.halt_bug = true;
-        }        
-        return 0;
+        }
+        if(!cpu.halt_bug && cpu.is_halted) {
+            return 0;
+        } 
     }
     
     //
@@ -101,6 +103,7 @@ byte cpu_cycle()
         printf("haltbuggin\n");
         PC--;
         cpu.halt_bug = false;
+        return 0;
     }
 
     execute(cur_instr);

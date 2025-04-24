@@ -54,13 +54,20 @@ byte mem_read(word address){
     if(address == JOYP) {
         return update_joypad();
     }
+    else if(address >= 0xE000 && address <= 0xFDFF) {
+        printf("echo!\n");
+        return MEM[address - 0x2000];
+    }
     else {
         return MEM[address];
     }
 }
 
 word mem_read16(word address){
-    return MEM[address] | (MEM[address+1] << 8);
+    byte base = mem_read(address);
+    byte next = mem_read(address + 1);
+
+    return base | (next << 8);
 }
 
 //TODO: Handle cases where specific bits(or whole registers) are read only

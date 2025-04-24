@@ -6,14 +6,8 @@
 #define CYCLES_PER_FRAME 70224
 
 //
-// The issue currently with flickering is related to how our ppu handles
-// being turned off and how this creates issues down the pipeline. There
-// will be slight inconsistencies that appear slowly as we run the ppu
-// and the number of cycles progressively become more and more off.
-//
-// Also catrap decided to fucking break...
-//
-// Maybe current rendering bug is related to STAT IRQ blocking? i didnt implement it
+// Current issue with Dr. Mario is that LCD becomes disabled and never re-enabled. Something to do likely
+// with how we service interrupts.
 //
 
 void emulate() {
@@ -58,8 +52,8 @@ void emulate() {
                 ppu_cycle(cycles);
                 do_interrupts();
             }
+            printf("%c", perform_serial());
         }
-        // printf("%c", perform_serial());
 
         frame_time = SDL_GetTicks() - frame_start;
         if (frame_time < frame_delay) {

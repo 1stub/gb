@@ -66,7 +66,9 @@ void ppu_cycle(int cycles)
         if(ppu.cycles > 70224) {
             ppu.cycles -= 70224;
         }
-        SET_STAT_STATE(VBlank);
+        SET_STAT_STATE(HBLANK_FLAG);
+        mem_write(LY, 0x00);
+        // ppu.pixel = 0;
         return ;
     }
 

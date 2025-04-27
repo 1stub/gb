@@ -16,8 +16,7 @@
 typedef struct{
     byte memory[0x10000];
     int divider_counter;
-    int is_mbc1;
-}MMU;
+} MMU;
 
 extern MMU mmu;
 

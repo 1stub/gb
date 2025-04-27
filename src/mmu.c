@@ -3,7 +3,7 @@
 #include "../include/interrupt.h"
 #include "../include/joypad.h"
 #include "../include/mbc1.h"
-#include <string.h>
+#include <assert.h>
 
 #define MEM mmu.memory 
 MMU mmu;
@@ -47,16 +47,21 @@ void mmu_init(){
     MEM[0xFF4B] = 0x00 ;
     MEM[IE] = 0x00 ;
 
-    mmu.is_mbc1 = false;
+    mbc1.is_enabled = false;
 
     // Cart header MBC stuff
     switch(MEM[0x147]) {
-        case 0: mmu.is_mbc1 = false; break;
-        case 1: mmu.is_mbc1 = true; break;
-        case 2: mmu.is_mbc1 = true; break;
-        case 3: mmu.is_mbc1 = true; break;
+        case 0: mbc1.is_enabled = false; break;
+        case 1: mbc1.is_enabled = true; break;
+        case 2: mbc1.is_enabled = true; break;
+        case 3: mbc1.is_enabled = true; break;
         default: assert(false);
     }
+
+    // Important initializers
+    mbc1.current_ram_bank = 0;
+    mbc1.current_rom_bank = 1;
+    printf("mbc1 %i\n", mbc1.is_enabled);
 }
 
 byte mem_read(word address){
@@ -101,6 +106,12 @@ void mem_write(word address, byte value){
     }
     if(address <= 0x7FFF) {
         handle_banking_mbc1(address, value);
+    }
+    else if(address >= 0xA000 && address <= 0xBFFF) {
+        if(mbc1.enable_ram) {
+            word newaddr = address - 0xA000;
+            mbc1.ram_banks[newaddr + (mbc1.current_ram_bank * 0x2000)] = value;
+        }
     }
     else if (address <= 0xFDFF && address >= 0xE000) {
         // No clue if this is how to properly handle ECHO writes

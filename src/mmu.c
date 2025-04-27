@@ -4,6 +4,7 @@
 #include "../include/joypad.h"
 #include "../include/mbc1.h"
 #include <assert.h>
+#include <string.h>
 
 #define MEM mmu.memory 
 MMU mmu;
@@ -47,6 +48,9 @@ void mmu_init(){
     MEM[0xFF4B] = 0x00 ;
     MEM[IE] = 0x00 ;
 
+    // Not completely sure, but we may need a fresh copy of cart ROM stored
+    // memcpy(mbc1.cart_rom, MEM, 0x8000);
+
     mbc1.is_enabled = false;
 
     // Cart header MBC stuff
@@ -59,8 +63,9 @@ void mmu_init(){
     }
 
     // Important initializers
-    mbc1.current_ram_bank = 0;
-    mbc1.current_rom_bank = 1;
+    mbc1.ram_bank_number = 0;
+    mbc1.rom_bank_number = 1;
+    mbc1.ram_enable = false;
     printf("mbc1 %i\n", mbc1.is_enabled);
 }
 
@@ -68,15 +73,18 @@ byte mem_read(word address){
     if(GB_ENABLE_JSON_TESTING) {
         return MEM[address];
     }
+    if(address < 0x4000) {
+        return MEM[address];
+    }
     // Check if reading from rom memory bank
-    if(address >= 0x4000 && address <= 0x7FFF) {
+    else if(address >= 0x4000 && address <= 0x7FFF) {
         word newaddr = address - 0x4000;
-        return MEM[newaddr + (mbc1.current_rom_bank * 0x4000)];
+        return MEM[newaddr + (mbc1.rom_bank_number * 0x4000)];
     }
     // Check if reading from ram memory bank
     else if(address >= 0xA000 && address <= 0xBFFF) {
         word newaddr = address - 0xA000;
-        return mbc1.ram_banks[newaddr + (mbc1.current_ram_bank * 0x2000)];
+        return mbc1.ram_banks[newaddr + (mbc1.ram_bank_number * 0x2000)];
     }
     // Capture attempt to read joypad
     else if(address == JOYP) {
@@ -108,9 +116,9 @@ void mem_write(word address, byte value){
         handle_banking_mbc1(address, value);
     }
     else if(address >= 0xA000 && address <= 0xBFFF) {
-        if(mbc1.enable_ram) {
+        if(mbc1.ram_enable) {
             word newaddr = address - 0xA000;
-            mbc1.ram_banks[newaddr + (mbc1.current_ram_bank * 0x2000)] = value;
+            mbc1.ram_banks[newaddr + (mbc1.ram_bank_number * 0x2000)] = value;
         }
     }
     else if (address <= 0xFDFF && address >= 0xE000) {

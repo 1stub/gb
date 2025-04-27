@@ -4,11 +4,11 @@
 
 typedef struct {
     int is_enabled;
-    int enable_ram;
-    int enable_rom;
+    int ram_enable;
+    byte rom_bank_number;
+    byte ram_bank_number;
     byte ram_banks[0x8000];
-    byte current_rom_bank;
-    byte current_ram_bank;
+    byte cart_rom[0x8000];
 } MBC1;
 
 extern MBC1 mbc1;

@@ -5,7 +5,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/output/gb",
-            "args": ["${workspaceFolder}/../gameboy_roms/Catrap\\ \\(USA\\).gb"],
+            "args": ["${workspaceFolder}/tests/mooneye/mbc1/bits_bank1.gb"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

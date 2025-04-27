@@ -5,6 +5,8 @@ extern "C" {
 }
 
 int main(int argc, char** argv) {
+    load_rom(argv[1]);
+
     cpu_init();
     mmu_init();
     ppu_init();
@@ -15,7 +17,6 @@ int main(int argc, char** argv) {
         run_json_tests();
     }
 
-    load_rom(argv[1]);
     emulate();
     
     return 0;

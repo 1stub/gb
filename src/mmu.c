@@ -2,6 +2,7 @@
 #include "../include/cpu.h"
 #include "../include/interrupt.h"
 #include "../include/joypad.h"
+#include "../include/mbc1.h"
 #include <string.h>
 
 #define MEM mmu.memory 
@@ -10,7 +11,7 @@ MMU mmu;
 void do_dma(byte data);
 
 void mmu_init(){
-    memset(MEM, 0, sizeof(MEM) * sizeof(byte));
+    // memset(MEM, 0, sizeof(MEM) * sizeof(byte));
 
     MEM[0xFF00] = 0x1F;
     MEM[TIMA] = 0x00 ; 
@@ -45,17 +46,39 @@ void mmu_init(){
     MEM[0xFF4A] = 0x00 ;
     MEM[0xFF4B] = 0x00 ;
     MEM[IE] = 0x00 ;
+
+    mmu.is_mbc1 = false;
+
+    // Cart header MBC stuff
+    switch(MEM[0x147]) {
+        case 0: mmu.is_mbc1 = false; break;
+        case 1: mmu.is_mbc1 = true; break;
+        case 2: mmu.is_mbc1 = true; break;
+        case 3: mmu.is_mbc1 = true; break;
+        default: assert(false);
+    }
 }
 
 byte mem_read(word address){
     if(GB_ENABLE_JSON_TESTING) {
         return MEM[address];
     }
-    if(address == JOYP) {
+    // Check if reading from rom memory bank
+    if(address >= 0x4000 && address <= 0x7FFF) {
+        word newaddr = address - 0x4000;
+        return MEM[newaddr + (mbc1.current_rom_bank * 0x4000)];
+    }
+    // Check if reading from ram memory bank
+    else if(address >= 0xA000 && address <= 0xBFFF) {
+        word newaddr = address - 0xA000;
+        return mbc1.ram_banks[newaddr + (mbc1.current_ram_bank * 0x2000)];
+    }
+    // Capture attempt to read joypad
+    else if(address == JOYP) {
         return update_joypad();
     }
+    // ECHO memory
     else if(address >= 0xE000 && address <= 0xFDFF) {
-        printf("echo!\n");
         return MEM[address - 0x2000];
     }
     else {
@@ -77,11 +100,11 @@ void mem_write(word address, byte value){
         return ;
     }
     if(address <= 0x7FFF) {
-        //printf("Attempted to write to ROM!\n");
+        handle_banking_mbc1(address, value);
     }
     else if (address <= 0xFDFF && address >= 0xE000) {
-        printf("echo!\n");
-        // Eh not sure how to handle properly (echo memory)
+        // No clue if this is how to properly handle ECHO writes
+        MEM[address - 0x2000] = value;
     }
     else if(address == LY) {
         MEM[LY] = 0;

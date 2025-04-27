@@ -59,20 +59,6 @@ void cpu_init()
 
 byte cpu_cycle() 
 {
-    if(!cpu.can_run) {
-        return 0;
-    }
-
-    if(cpu.cycles > 4) {
-        cpu.cycles -= 4;
-        return 4;
-    }
-
-    if(cpu.should_set_ime) {
-        IME = true;
-        cpu.should_set_ime = false;
-    }
-
     if(cpu.is_halted) {     
         //we dont care about top 3 bits in ie or if
         //could be set but we need to not change haltbug   
@@ -87,6 +73,20 @@ byte cpu_cycle()
         if(!cpu.halt_bug && cpu.is_halted) {
             return 0;
         } 
+    }
+
+    if(!cpu.can_run) {
+        return 0;
+    }
+
+    if(cpu.cycles > 4) {
+        cpu.cycles -= 4;
+        return 4;
+    }
+
+    if(cpu.should_set_ime) {
+        IME = true;
+        cpu.should_set_ime = false;
     }
     
     //

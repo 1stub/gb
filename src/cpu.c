@@ -35,11 +35,6 @@ static inline void SET_FLAGS(int z, int n, int h, int c)
     else if (c > 0) F |= FLAG_C;
 }
 
-//
-//TODO: Halt bug test fails. Could be caused my non-delayed EI
-//instruction?
-//
-
 void cpu_init()
 {
     AF = 0x01B0;
@@ -59,20 +54,9 @@ void cpu_init()
 
 byte cpu_cycle() 
 {
-    if(cpu.is_halted) {     
-        //we dont care about top 3 bits in ie or if
-        //could be set but we need to not change haltbug   
-        if(IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
-            cpu.is_halted = false;
-            cpu.halt_bug = false;
-        }
-        if(!IME && (mem_read(IE) & mem_read(IF) & 0x1F)) {
-            cpu.is_halted = false;
-            cpu.halt_bug = true;
-        }
-        if(!cpu.halt_bug && cpu.is_halted) {
-            return 0;
-        } 
+    if(cpu.should_set_ime) {
+        IME = true;
+        cpu.should_set_ime = false;
     }
 
     if(!cpu.can_run) {
@@ -84,17 +68,6 @@ byte cpu_cycle()
         return 4;
     }
 
-    if(cpu.should_set_ime) {
-        IME = true;
-        cpu.should_set_ime = false;
-    }
-    
-    //
-    //We need to make sure to do one pc inc when fetching
-    //the opcode and then inc accordingly inside the instr
-    //itself. If we dont we are unable to properly replicate halt bug
-    //
-
     //fetch opcode
     byte cur_instr = mem_read(PC++);    
     byte extendex_table_index = mem_read(PC);
@@ -103,13 +76,12 @@ byte cpu_cycle()
         printf("haltbuggin\n");
         PC--;
         cpu.halt_bug = false;
-        return 0;
     }
 
     execute(cur_instr);
 
     if(cur_instr == 0xCB){
-        cpu.cycles = extended_cycles[extendex_table_index];   
+        cpu.cycles = extended_cycles[extendex_table_index];
     }
     else{
         cpu.cycles = cycles[cur_instr];
@@ -514,7 +486,18 @@ static inline void RST(byte val){
 
 static inline void HALT()
 {
-    cpu.is_halted = true;
+    if(IME) {
+        cpu.is_halted = true;
+    }
+    else {
+        if(mem_read(IE) & mem_read(IF) & 0x1F) {
+            cpu.halt_bug = true;
+        }
+        else {
+            cpu.is_halted = true;
+        }
+    }
+
 }
 
 static inline void ADD(byte* dst, byte val) {

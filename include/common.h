@@ -3,6 +3,9 @@
 #define GB_ENABLE_DEBUGGER 0
 #define GB_ENABLE_JSON_TESTING 0
 
+#define GB_RAM_SIZE 0x8000
+#define GB_TOTAL_MEMORY_SIZE 0x10000
+
 #define true 1
 #define false 0
 

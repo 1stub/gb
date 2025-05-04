@@ -31,15 +31,21 @@ void service_interrupt(int interrupt)
 
 void do_interrupts()
 {
-    if(IME){
-        byte req = mem_read(IF);
-        byte flag = mem_read(IE);
-        if(req > 0){
-            for(int i = 0; i < 5; i++){
-                if(req & (1 << i)){
-                    if(flag & (1 << i)){
-                        service_interrupt(i);
-                    }
+    if(!IME) {
+        return ;
+    }
+
+    if(!(mem_read(IE) & mem_read(IF) & 0x1F)) {
+        return ;
+    }
+
+    byte req = mem_read(IF);
+    byte flag = mem_read(IE);
+    if(req > 0){
+        for(int i = 0; i < 5; i++){
+            if(req & (1 << i)){
+                if(flag & (1 << i)){
+                    service_interrupt(i);
                 }
             }
         }

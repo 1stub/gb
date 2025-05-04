@@ -60,12 +60,8 @@ void change_low_rom_bank(byte value)
     mbc1.rom_bank_number &= 0xE0; // Turn off lower five
     mbc1.rom_bank_number |= lower_five_bits;
 
-    switch(mbc1.rom_bank_number) {
-        case 0x00: break;
-        case 0x20: break;
-        case 0x40: break;
-        case 0x60: mbc1.rom_bank_number++; break; 
-        default: break;
+    if(mbc1.rom_bank_number == 0) {
+        mbc1.rom_bank_number++;
     }
 }
 
@@ -75,12 +71,8 @@ void change_high_rom_bank(byte value)
     value &= 0xE0;
     mbc1.rom_bank_number |= value;
 
-    switch(mbc1.rom_bank_number) {
-        case 0x00: break;
-        case 0x20: break;
-        case 0x40: break;
-        case 0x60: mbc1.rom_bank_number++; break; 
-        default: break;
+    if(mbc1.rom_bank_number == 0) {
+        mbc1.rom_bank_number++;
     }
 }
 
@@ -91,8 +83,8 @@ void change_ram_bank(byte value)
 
 void change_rom_or_ram_mode(byte value)
 {
-    mbc1.ram_enable = ((value & 0x01)) ? false : true;
-    if(!mbc1.ram_enable) {
+    mbc1.ram_enable = ((value & 0x01) == 0) ? true : false;
+    if(mbc1.ram_enable) {
         mbc1.ram_bank_number = 0;
     }
 }

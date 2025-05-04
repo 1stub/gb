@@ -14,7 +14,8 @@
 //0xFFFF Interrupt Enable
 
 typedef struct{
-    byte memory[0x10000];
+    byte memory[GB_TOTAL_MEMORY_SIZE];
+    byte* cart_rom;
     int divider_counter;
 } MMU;
 

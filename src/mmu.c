@@ -3,17 +3,18 @@
 #include "../include/interrupt.h"
 #include "../include/joypad.h"
 #include "../include/mbc1.h"
-#include <assert.h>
-#include <string.h>
+#include <assert.h> //assert, duh
+#include <string.h> //memset
+
+#include <stdlib.h> //malloc
 
 #define MEM mmu.memory 
 MMU mmu;
 
 void do_dma(byte data);
 
-void mmu_init(){
-    // memset(MEM, 0, sizeof(MEM) * sizeof(byte));
-
+void mmu_init()
+{
     MEM[0xFF00] = 0x1F;
     MEM[TIMA] = 0x00 ; 
     MEM[TMA]  = 0x00 ; 
@@ -49,7 +50,6 @@ void mmu_init(){
     MEM[IE] = 0x00 ;
 
     // Not completely sure, but we may need a fresh copy of cart ROM stored
-    // memcpy(mbc1.cart_rom, MEM, 0x8000);
 
     mbc1.is_enabled = false;
 
@@ -66,6 +66,9 @@ void mmu_init(){
     mbc1.ram_bank_number = 0;
     mbc1.rom_bank_number = 1;
     mbc1.ram_enable = false;
+
+    memset(&mbc1.ram_banks, 0, sizeof mbc1.ram_banks);
+
     printf("mbc1 %i\n", mbc1.is_enabled);
 }
 
@@ -79,7 +82,7 @@ byte mem_read(word address){
     // Check if reading from rom memory bank
     else if(address >= 0x4000 && address <= 0x7FFF) {
         word newaddr = address - 0x4000;
-        return MEM[newaddr + (mbc1.rom_bank_number * 0x4000)];
+        return mmu.cart_rom[newaddr + (mbc1.rom_bank_number * 0x4000)];
     }
     // Check if reading from ram memory bank
     else if(address >= 0xA000 && address <= 0xBFFF) {
@@ -177,12 +180,21 @@ void load_rom(char *file){
         return ;
     }
 
-    size_t ret = fread(MEM, sizeof(byte), 0x10000, fp);
-    if (ret == 0) {
+    // We get the size of whole rom and store it in mmu.cart_rom
+    fseek(fp, 0, SEEK_END);
+    size_t file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    mmu.cart_rom = (byte*)malloc(file_size);
+
+    size_t crom = fread(mmu.cart_rom, sizeof(byte), file_size, fp);
+    size_t ram_size = file_size >= 0x8000 ? 0x8000 : file_size;
+    memcpy(MEM, mmu.cart_rom, ram_size);
+
+    if (crom == 0) {
         fprintf(stderr, "fread() failed or file is empty\n");
     }
-    if(!ret){
-        fprintf(stderr, "fread() failed: %zu\n", ret);
+    if(!crom){
+        fprintf(stderr, "fread() failed: %zu\n", crom);
     }
 
     fclose(fp);

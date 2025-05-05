@@ -32,6 +32,7 @@ void emulate() {
 
             cpu_cycle();
             ppu_cycle(4);
+
             do_interrupts();
             printf("%c", perform_serial());
         }

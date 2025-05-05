@@ -35,10 +35,6 @@ void do_interrupts()
         return ;
     }
 
-    if(!(mem_read(IE) & mem_read(IF) & 0x1F)) {
-        return ;
-    }
-
     byte req = mem_read(IF);
     byte flag = mem_read(IE);
     if(req > 0){
@@ -50,4 +46,6 @@ void do_interrupts()
             }
         }
     }
+
+    cpu.is_halted = false;
 }

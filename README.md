@@ -1,8 +1,13 @@
 # gb
-A DMG GameBoy emulator written in modern C. This is not intended to be an accurate representation of GameBoy hardware, rather my attempt at making all fundamental aspects of GameBoy hardware functionality understandable. Hopefully this could serve as a nice reference for other emulator developers.
+A DMG GameBoy emulator written in modern C. This is not a good representation of actual GameBoy hardware functionality, but rather my attempt at making it somewhat easy to understand.
+
+This is also incredibly buggy, very few games work and all contain graphical errors but are playable.
 
 ## Screenshots
 | DMG-ACID2 |   Catrap   | Tetris |
 | ------------------------|------------------------|------------------------|
 | ![DMG-ACID2](pics/dmgacid.png) | ![Catrap](pics/catrap.png)| ![Tetris](pics/tetris.png)|
 
+| The Legend of Zelda | Pacman |
+| ------------------------|-----------------------|
+| ![Zelda](pics/zelda.png) | ![Pacman](pics/pacman.png)
